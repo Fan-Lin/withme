@@ -11,1378 +11,864 @@
 <title>WithMe</title>
 <script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=Noto+Serif+SC:wght@400;600&family=Caveat:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <style>
-/* ══════════════════════════════════════
-   THEME SYSTEM
-   themes: default (dark green) | classic (warm sepia) | journal (soft cream)
-══════════════════════════════════════ */
-:root {
-  --bg: #0f1f18;
-  --surface: #1a2e23;
-  --surface2: #243d2f;
-  --border: #2d5240;
-  --gold: #C9A96E;
-  --gold-dim: #8a7050;
-  --text: #e8e0d0;
-  --text-dim: #8a9e8f;
-  --red: #c97070;
-  --font-display: 'Cormorant Garamond', serif;
-  --font-body: 'DM Sans', sans-serif;
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-[data-theme="classic"] {
-  --bg: #1a1208;
-  --surface: #2a1f0f;
-  --surface2: #362a14;
-  --border: #5a4020;
-  --gold: #D4A853;
-  --gold-dim: #8a6830;
-  --text: #f0e6cc;
-  --text-dim: #9a8060;
-  --red: #c07060;
-  --font-display: 'Noto Serif SC', serif;
-  --font-body: 'DM Sans', sans-serif;
-}
-
-[data-theme="journal"] {
-  --bg: #f5f0e8;
-  --surface: #ede6d8;
-  --surface2: #e0d8c8;
-  --border: #c8bca8;
-  --gold: #8B6914;
-  --gold-dim: #b89040;
-  --text: #2a2018;
-  --text-dim: #7a6848;
-  --red: #a03030;
-  --font-display: 'Caveat', cursive;
-  --font-body: 'DM Sans', sans-serif;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
-body {
-  font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--text);
-  height: 100dvh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: background 0.3s, color 0.3s;
-}
-
-/* ── MAP ── */
-#map { flex: 1; width: 100%; position: relative; z-index: 1; }
-.leaflet-tile-pane { filter: saturate(0.7) brightness(0.85); }
-[data-theme="journal"] .leaflet-tile-pane { filter: saturate(0.5) brightness(1.05) sepia(0.2); }
-[data-theme="classic"] .leaflet-tile-pane { filter: saturate(0.5) brightness(0.8) sepia(0.3); }
-.leaflet-container { background: var(--bg); }
-
-/* ── TOP BAR ── */
-#topbar {
-  position: absolute;
-  top: calc(12px + var(--safe-top));
-  left: 0; right: 0;
-  z-index: 500;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
-}
-#topbar.hidden { opacity: 0; pointer-events: none; transform: translateY(-8px); }
-
-#city-pill {
-  pointer-events: all;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 8px 16px;
-  display: flex; align-items: center; gap: 8px;
-  cursor: pointer;
-  font-size: 14px; font-weight: 500;
-  color: var(--text);
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s;
-}
-#city-pill:active { border-color: var(--gold); }
-#city-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
-
-#top-actions { pointer-events: all; display: flex; gap: 8px; }
-.top-btn {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text); font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: border-color 0.2s, background 0.2s;
-}
-.top-btn:active { background: var(--surface2); border-color: var(--gold); }
-
-/* ── BOTTOM NAV ── */
-#bottom-nav {
-  position: absolute;
-  bottom: calc(24px + var(--safe-bottom));
-  left: 50%; transform: translateX(-50%);
-  z-index: 500;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 32px;
-  padding: 6px;
-  display: flex; gap: 4px;
-  backdrop-filter: blur(12px);
-}
-.nav-btn {
-  padding: 10px 18px;
-  border-radius: 26px; border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-family: var(--font-body);
-  font-size: 13px; font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.nav-btn.active { background: var(--gold); color: #1a1a0e; font-weight: 600; }
-
-/* ── FAB ── */
-#fab {
-  position: absolute;
-  bottom: calc(104px + var(--safe-bottom));
-  right: 20px; z-index: 500;
-  width: 52px; height: 52px;
-  border-radius: 50%;
-  background: var(--gold); border: none;
-  color: #1a1a0e; font-size: 26px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(201,169,110,0.35);
-  transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-}
-#fab:active { transform: scale(0.93); }
-#fab.hidden { opacity: 0; pointer-events: none; }
-
-/* ── PANELS ── */
-.panel {
-  position: absolute; inset: 0;
-  z-index: 400;
-  background: var(--bg);
-  display: none; flex-direction: column; overflow: hidden;
-}
-.panel.open { display: flex; }
-
-.panel-header {
-  padding: calc(16px + var(--safe-top)) 20px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; gap: 12px;
-}
-.panel-title {
-  font-family: var(--font-display);
-  font-size: 22px; font-weight: 600;
-  color: var(--text); flex: 1;
-}
-.panel-back {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--surface2); border: none;
-  color: var(--text); font-size: 18px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-}
-.panel-body {
-  flex: 1; overflow-y: auto; padding: 16px;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* ── SHEETS ── */
-.sheet-overlay {
-  position: absolute; inset: 0; z-index: 600;
-  background: rgba(0,0,0,0.5);
-  display: none; align-items: flex-end;
-}
-.sheet-overlay.open { display: flex; }
-.sheet {
-  width: 100%;
-  background: var(--surface);
-  border-radius: 20px 20px 0 0;
-  border-top: 1px solid var(--border);
-  padding-bottom: calc(24px + var(--safe-bottom));
-  max-height: 85dvh;
-  display: flex; flex-direction: column;
-  animation: slideUp 0.25s ease;
-}
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.sheet-handle {
-  width: 36px; height: 4px;
-  background: var(--border); border-radius: 2px;
-  margin: 12px auto 8px; flex-shrink: 0;
-}
-.sheet-title {
-  font-family: var(--font-display);
-  font-size: 20px; font-weight: 600;
-  padding: 8px 20px 16px;
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
-}
-.sheet-body { padding: 16px 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-
-/* ── FORMS ── */
-.field { margin-bottom: 16px; }
-.field label {
-  display: block; font-size: 11px; font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-dim); margin-bottom: 6px;
-}
-.field input, .field textarea, .field select {
-  width: 100%; background: var(--bg);
-  border: 1px solid var(--border); border-radius: 10px;
-  padding: 10px 14px; color: var(--text);
-  font-family: var(--font-body); font-size: 15px;
-  outline: none; transition: border-color 0.2s;
-  -webkit-appearance: none;
-}
-.field input:focus, .field textarea:focus { border-color: var(--gold); }
-.field textarea { resize: none; min-height: 80px; line-height: 1.5; }
-
-.emoji-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; }
-.emoji-btn {
-  aspect-ratio: 1; border-radius: 10px;
-  background: var(--bg); border: 1.5px solid var(--border);
-  font-size: 22px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: border-color 0.15s, background 0.15s;
-}
-.emoji-btn.selected { border-color: var(--gold); background: rgba(201,169,110,0.12); }
-
-.mood-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-.mood-btn {
-  padding: 8px 14px; border-radius: 20px;
-  background: var(--bg); border: 1.5px solid var(--border);
-  font-size: 20px; cursor: pointer; transition: border-color 0.15s;
-}
-.mood-btn.selected { border-color: var(--gold); background: rgba(201,169,110,0.12); }
-
-.btn-primary {
-  width: 100%; padding: 14px; border-radius: 12px;
-  background: var(--gold); border: none;
-  color: #1a1a0e; font-family: var(--font-body);
-  font-size: 15px; font-weight: 600;
-  cursor: pointer; margin-top: 8px; transition: opacity 0.15s;
-}
-.btn-primary:active { opacity: 0.85; }
-.btn-secondary {
-  width: 100%; padding: 13px; border-radius: 12px;
-  background: transparent; border: 1px solid var(--border);
-  color: var(--text); font-family: var(--font-body);
-  font-size: 15px; cursor: pointer; margin-top: 8px;
-  transition: border-color 0.15s;
-}
-.btn-secondary:active { border-color: var(--gold); }
-.btn-danger {
-  width: 100%; padding: 13px; border-radius: 12px;
-  background: transparent; border: 1px solid #5a2020;
-  color: var(--red); font-family: var(--font-body);
-  font-size: 15px; cursor: pointer; margin-top: 8px;
-}
-
-/* ── CARDS ── */
-.diary-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px; margin-bottom: 12px;
-  cursor: pointer; transition: border-color 0.2s;
-  position: relative; overflow: hidden;
-}
-.diary-card:active { border-color: var(--gold); }
-.diary-card::before {
-  content: ''; position: absolute;
-  left: 0; top: 0; bottom: 0; width: 3px;
-  background: var(--gold); opacity: 0; transition: opacity 0.2s;
-}
-.diary-card:active::before { opacity: 1; }
-.diary-date { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.05em; }
-.diary-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; margin-bottom: 6px; }
-.diary-meta { display: flex; gap: 10px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; }
-.diary-meta span { display: flex; align-items: center; gap: 3px; }
-.diary-story {
-  font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-top: 8px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-
-/* ── ROUTE DETAIL ── */
-.route-detail-header { padding: 20px; border-bottom: 1px solid var(--border); }
-.route-detail-title { font-family: var(--font-display); font-size: 26px; font-weight: 600; margin-bottom: 4px; }
-.route-detail-meta { font-size: 12px; color: var(--text-dim); display: flex; gap: 12px; flex-wrap: wrap; }
-.pin-list-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-.pin-icon { font-size: 24px; flex-shrink: 0; }
-.pin-info { flex: 1; }
-.pin-note { font-size: 14px; line-height: 1.5; }
-.pin-time { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-.pin-photo { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-
-/* ── CITY ── */
-.city-item { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); cursor: pointer; gap: 12px; }
-.city-item-name { flex: 1; font-size: 16px; }
-.city-item-count { font-size: 12px; color: var(--text-dim); }
-.city-active-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
-
-/* ── EMPTY STATE ── */
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 30px; text-align: center; gap: 12px; }
-.empty-icon { font-size: 48px; opacity: 0.4; }
-.empty-text { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
-
-/* ── TOAST ── */
-#toast {
-  position: absolute;
-  bottom: calc(100px + var(--safe-bottom));
-  left: 50%; transform: translateX(-50%) translateY(20px);
-  z-index: 900;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 24px; padding: 10px 20px;
-  font-size: 14px; white-space: nowrap;
-  opacity: 0; transition: opacity 0.2s, transform 0.2s;
-  pointer-events: none;
-}
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-/* ── PIN MARKERS ── */
-.pin-marker {
-  width: 36px; height: 36px;
-  border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid rgba(255,255,255,0.3);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4); font-size: 16px;
-}
-.pin-inner { transform: rotate(45deg); }
-
-/* ── IMPORT AREA ── */
-.import-area {
-  border: 2px dashed var(--border); border-radius: 14px;
-  padding: 28px 20px; text-align: center;
-  cursor: pointer; transition: border-color 0.2s; margin-bottom: 16px;
-}
-.import-area:active { border-color: var(--gold); }
-.import-area-icon { font-size: 32px; margin-bottom: 8px; }
-.import-area-text { font-size: 14px; color: var(--text-dim); }
-
-.photo-preview { width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; display: none; }
-
-.color-row { display: flex; gap: 10px; margin-top: 4px; }
-.color-dot { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s; }
-.color-dot.selected { border-color: var(--text); }
-
-/* ── THEME SWITCHER ── */
-.theme-row { display: flex; gap: 10px; margin-top: 4px; }
-.theme-swatch {
-  flex: 1; padding: 12px 8px; border-radius: 12px;
-  border: 1.5px solid var(--border);
-  cursor: pointer; text-align: center;
-  font-size: 11px; font-weight: 500;
-  transition: border-color 0.15s;
-}
-.theme-swatch.selected { border-color: var(--gold); }
-.theme-swatch-dot { width: 20px; height: 20px; border-radius: 50%; margin: 0 auto 6px; }
-
-/* ── LANG TOGGLE ── */
-.lang-toggle {
-  display: flex; background: var(--bg); border-radius: 20px;
-  border: 1px solid var(--border); overflow: hidden;
-}
-.lang-btn {
-  flex: 1; padding: 8px 12px; border: none; background: transparent;
-  color: var(--text-dim); font-family: var(--font-body);
-  font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
-}
-.lang-btn.active { background: var(--gold); color: #1a1a0e; font-weight: 600; }
-
-/* ── ACHIEVEMENTS ── */
-.achievement-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; }
-.ach-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 14px; text-align: center;
-  transition: border-color 0.2s;
-}
-.ach-card.unlocked { border-color: var(--gold); background: rgba(201,169,110,0.08); }
-.ach-card.locked { opacity: 0.45; }
-.ach-icon { font-size: 32px; margin-bottom: 6px; }
-.ach-name { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-bottom: 3px; }
-.ach-desc { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
-.ach-date { font-size: 10px; color: var(--gold); margin-top: 4px; }
-
-/* ── ACHIEVEMENT POPUP ── */
-#ach-popup {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%) scale(0.7);
-  z-index: 999;
-  background: var(--surface);
-  border: 2px solid var(--gold);
-  border-radius: 24px; padding: 32px 28px;
-  text-align: center; width: 280px;
-  opacity: 0; pointer-events: none;
-  transition: opacity 0.3s, transform 0.3s;
-}
-#ach-popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: all; }
-#ach-popup-icon { font-size: 52px; margin-bottom: 10px; }
-#ach-popup-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
-#ach-popup-name { font-family: var(--font-display); font-size: 22px; font-weight: 600; margin-bottom: 6px; }
-#ach-popup-desc { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
-
-/* ── STATS ── */
-.stats-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 20px; }
-.stat-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px; text-align: center;
-}
-.stat-value { font-family: var(--font-display); font-size: 28px; font-weight: 600; color: var(--gold); }
-.stat-label { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
-
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+:root{--bg:#0f1f18;--surface:#1a2e23;--surface2:#243d2f;--border:#2d5240;--gold:#C9A96E;--gold-dim:#8a7050;--text:#e8e0d0;--text-dim:#8a9e8f;--red:#c97070;--font-display:'Cormorant Garamond',serif;--font-body:'DM Sans',sans-serif;--safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px)}
+[data-theme="classic"]{--bg:#1a1208;--surface:#2a1f0f;--surface2:#362a14;--border:#5a4020;--gold:#D4A853;--gold-dim:#8a6830;--text:#f0e6cc;--text-dim:#9a8060;--red:#c07060;--font-display:'Noto Serif SC',serif}
+[data-theme="journal"]{--bg:#f5f0e8;--surface:#ede6d8;--surface2:#e0d8c8;--border:#c8bca8;--gold:#8B6914;--gold-dim:#b89040;--text:#2a2018;--text-dim:#7a6848;--red:#a03030;--font-display:'Caveat',cursive}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;display:flex;flex-direction:column;transition:background .3s,color .3s}
+#map{flex:1;width:100%;position:relative;z-index:1}
+.leaflet-tile-pane{filter:saturate(.7) brightness(.85)}
+[data-theme="journal"] .leaflet-tile-pane{filter:saturate(.5) brightness(1.05) sepia(.2)}
+[data-theme="classic"] .leaflet-tile-pane{filter:saturate(.5) brightness(.8) sepia(.3)}
+.leaflet-container{background:var(--bg)}
+#topbar{position:absolute;top:calc(12px + var(--safe-top));left:0;right:0;z-index:500;display:flex;align-items:center;justify-content:space-between;padding:0 16px;pointer-events:none;transition:opacity .2s,transform .2s}
+#topbar.hidden{opacity:0;pointer-events:none;transform:translateY(-8px)}
+#city-pill{pointer-events:all;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:8px 16px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:500;color:var(--text);backdrop-filter:blur(8px)}
+#city-pill:active{border-color:var(--gold)}
+#city-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--gold)}
+#top-actions{pointer-events:all;display:flex;gap:8px}
+.top-btn{width:40px;height:40px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px)}
+.top-btn:active{background:var(--surface2);border-color:var(--gold)}
+#bottom-nav{position:absolute;bottom:calc(24px + var(--safe-bottom));left:50%;transform:translateX(-50%);z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:32px;padding:6px;display:flex;gap:4px;backdrop-filter:blur(12px)}
+.nav-btn{padding:10px 16px;border-radius:26px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font-body);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
+.nav-btn.active{background:var(--gold);color:#1a1a0e;font-weight:600}
+#fab{position:absolute;bottom:calc(104px + var(--safe-bottom));right:20px;z-index:500;width:52px;height:52px;border-radius:50%;background:var(--gold);border:none;color:#1a1a0e;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(201,169,110,.35);transition:transform .15s,opacity .2s}
+#fab:active{transform:scale(.93)}
+#fab.hidden{opacity:0;pointer-events:none}
+#locate-btn{position:absolute;bottom:calc(168px + var(--safe-bottom));right:20px;z-index:500;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);transition:border-color .2s,opacity .2s}
+#locate-btn:active{border-color:var(--gold)}
+#locate-btn.hidden{opacity:0;pointer-events:none}
+#heatmap-btn{position:absolute;bottom:calc(224px + var(--safe-bottom));right:20px;z-index:500;width:44px;height:44px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);transition:border-color .2s,opacity .2s}
+#heatmap-btn:active{border-color:var(--gold)}
+#heatmap-btn.hidden{opacity:0;pointer-events:none}
+#heatmap-btn.active-heat{border-color:var(--gold);background:var(--surface2)}
+.panel{position:absolute;inset:0;z-index:400;background:var(--bg);display:none;flex-direction:column;overflow:hidden}
+.panel.open{display:flex}
+.panel-header{padding:calc(16px + var(--safe-top)) 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.panel-title{font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--text);flex:1}
+.panel-back{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:none;color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.panel-body{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.sheet-overlay{position:absolute;inset:0;z-index:600;background:rgba(0,0,0,.5);display:none;align-items:flex-end}
+.sheet-overlay.open{display:flex}
+.sheet{width:100%;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border);padding-bottom:calc(24px + var(--safe-bottom));max-height:85dvh;display:flex;flex-direction:column;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 8px;flex-shrink:0}
+.sheet-title{font-family:var(--font-display);font-size:20px;font-weight:600;padding:8px 20px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sheet-body{padding:16px 20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:6px}
+.field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font-body);font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.field input:focus,.field textarea:focus{border-color:var(--gold)}
+.field textarea{resize:none;min-height:80px;line-height:1.5}
+.emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.emoji-btn{aspect-ratio:1;border-radius:10px;background:var(--bg);border:1.5px solid var(--border);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s,background .15s}
+.emoji-btn.selected{border-color:var(--gold);background:rgba(201,169,110,.12)}
+.mood-grid,.weather-grid,.tag-grid{display:flex;gap:8px;flex-wrap:wrap}
+.mood-btn,.weather-btn,.tag-btn{padding:8px 14px;border-radius:20px;background:var(--bg);border:1.5px solid var(--border);font-size:16px;cursor:pointer;transition:border-color .15s}
+.mood-btn.selected,.weather-btn.selected,.tag-btn.selected{border-color:var(--gold);background:rgba(201,169,110,.12)}
+.tag-btn{font-size:12px;display:flex;align-items:center;gap:4px}
+.btn-primary{width:100%;padding:14px;border-radius:12px;background:var(--gold);border:none;color:#1a1a0e;font-family:var(--font-body);font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .15s}
+.btn-primary:active{opacity:.85}
+.btn-secondary{width:100%;padding:13px;border-radius:12px;background:transparent;border:1px solid var(--border);color:var(--text);font-family:var(--font-body);font-size:15px;cursor:pointer;margin-top:8px}
+.btn-secondary:active{border-color:var(--gold)}
+.btn-danger{width:100%;padding:13px;border-radius:12px;background:transparent;border:1px solid #5a2020;color:var(--red);font-family:var(--font-body);font-size:15px;cursor:pointer;margin-top:8px}
+.diary-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;transition:border-color .2s;position:relative;overflow:hidden}
+.diary-card:active{border-color:var(--gold)}
+.diary-date{font-size:11px;color:var(--text-dim);margin-bottom:4px;letter-spacing:.05em}
+.diary-title{font-family:var(--font-display);font-size:18px;font-weight:600;margin-bottom:6px}
+.diary-meta{display:flex;gap:10px;font-size:12px;color:var(--text-dim);flex-wrap:wrap}
+.diary-meta span{display:flex;align-items:center;gap:3px}
+.diary-story{font-size:13px;color:var(--text-dim);line-height:1.6;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.diary-tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.diary-tag{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--surface2);color:var(--text-dim)}
+.route-detail-header{padding:20px;border-bottom:1px solid var(--border)}
+.route-detail-title{font-family:var(--font-display);font-size:26px;font-weight:600;margin-bottom:4px}
+.route-detail-meta{font-size:12px;color:var(--text-dim);display:flex;gap:12px;flex-wrap:wrap}
+.pin-list-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.pin-icon{font-size:24px;flex-shrink:0}
+.pin-info{flex:1}
+.pin-note{font-size:14px;line-height:1.5}
+.pin-time{font-size:11px;color:var(--text-dim);margin-top:2px}
+.pin-photo{width:60px;height:60px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.city-item{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;gap:12px}
+.city-item-name{flex:1;font-size:16px}
+.city-item-count{font-size:12px;color:var(--text-dim)}
+.city-active-dot{width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.city-delete{width:28px;height:28px;border-radius:50%;background:transparent;border:1px solid var(--border);color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.city-delete:active{border-color:var(--red)}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 30px;text-align:center;gap:12px}
+.empty-icon{font-size:48px;opacity:.4}
+.empty-text{color:var(--text-dim);font-size:14px;line-height:1.6}
+#toast{position:absolute;bottom:calc(100px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);z-index:900;background:var(--surface2);border:1px solid var(--border);border-radius:24px;padding:10px 20px;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.pin-marker{width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.3);box-shadow:0 2px 8px rgba(0,0,0,.4);font-size:16px}
+.pin-inner{transform:rotate(45deg)}
+.import-area{border:2px dashed var(--border);border-radius:14px;padding:28px 20px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:16px}
+.import-area:active{border-color:var(--gold)}
+.import-area-icon{font-size:32px;margin-bottom:8px}
+.import-area-text{font-size:14px;color:var(--text-dim)}
+.photo-preview{width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-bottom:8px;display:none}
+.color-row{display:flex;gap:10px;margin-top:4px}
+.color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.color-dot.selected{border-color:var(--text)}
+.theme-row{display:flex;gap:10px;margin-top:4px}
+.theme-swatch{flex:1;padding:12px 8px;border-radius:12px;border:1.5px solid var(--border);cursor:pointer;text-align:center;font-size:11px;font-weight:500;transition:border-color .15s}
+.theme-swatch.selected{border-color:var(--gold)}
+.theme-swatch-dot{width:20px;height:20px;border-radius:50%;margin:0 auto 6px}
+.lang-toggle{display:flex;background:var(--bg);border-radius:20px;border:1px solid var(--border);overflow:hidden}
+.lang-btn{flex:1;padding:8px 12px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font-body);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.lang-btn.active{background:var(--gold);color:#1a1a0e;font-weight:600}
+.achievement-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ach-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center}
+.ach-card.unlocked{border-color:var(--gold);background:rgba(201,169,110,.08)}
+.ach-card.locked{opacity:.45}
+.ach-icon{font-size:32px;margin-bottom:6px}
+.ach-name{font-family:var(--font-display);font-size:14px;font-weight:600;margin-bottom:3px}
+.ach-desc{font-size:11px;color:var(--text-dim);line-height:1.4}
+.ach-date{font-size:10px;color:var(--gold);margin-top:4px}
+#ach-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.7);z-index:999;background:var(--surface);border:2px solid var(--gold);border-radius:24px;padding:32px 28px;text-align:center;width:280px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+#ach-popup.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:all}
+#ach-popup-icon{font-size:52px;margin-bottom:10px}
+#ach-popup-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}
+#ach-popup-name{font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:6px}
+#ach-popup-desc{font-size:13px;color:var(--text-dim);line-height:1.5}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
+.stat-value{font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--gold)}
+.stat-label{font-size:11px;color:var(--text-dim);margin-top:3px}
+.search-bar{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;margin-bottom:12px}
+.search-bar:focus{border-color:var(--gold)}
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.photo-grid-item{aspect-ratio:1;border-radius:10px;object-fit:cover;cursor:pointer;border:1px solid var(--border)}
+.photo-grid-item:active{border-color:var(--gold)}
+#postcard-preview{background:var(--surface);border-radius:16px;overflow:hidden;margin-bottom:16px}
+#postcard-canvas{width:100%;display:block}
+.replay-bar{position:absolute;bottom:calc(88px + var(--safe-bottom));left:16px;right:16px;z-index:500;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px 16px;display:none;align-items:center;gap:12px;backdrop-filter:blur(12px)}
+.replay-bar.show{display:flex}
+.replay-progress{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.replay-fill{height:100%;background:var(--gold);transition:width .3s linear}
+.replay-close{background:none;border:none;color:var(--text);font-size:18px;cursor:pointer}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 </style>
 </head>
 <body>
-
 <div id="map"></div>
-
-<!-- TOP BAR -->
 <div id="topbar">
-  <div id="city-pill" onclick="openCityManager()">
-    <div class="dot"></div>
-    <span id="city-name-display">选择城市</span>
-  </div>
+  <div id="city-pill" onclick="openCityManager()"><div class="dot"></div><span id="city-name-display">选择城市</span></div>
   <div id="top-actions">
     <button class="top-btn" onclick="openImportSheet()">＋</button>
     <button class="top-btn" onclick="openSettingsSheet()">⚙</button>
   </div>
 </div>
-
-<!-- FAB -->
+<button id="heatmap-btn" onclick="toggleHeatmap()">🔥</button>
+<button id="locate-btn" onclick="locateMe()">◎</button>
 <button id="fab" onclick="startPinMode()">📍</button>
-
-<!-- BOTTOM NAV -->
 <div id="bottom-nav">
   <button class="nav-btn active" onclick="switchTab('map')" id="nav-map">地图</button>
   <button class="nav-btn" onclick="switchTab('diary')" id="nav-diary">日记</button>
   <button class="nav-btn" onclick="switchTab('routes')" id="nav-routes">路线</button>
+  <button class="nav-btn" onclick="switchTab('photos')" id="nav-photos">相册</button>
   <button class="nav-btn" onclick="switchTab('achievements')" id="nav-achievements">成就</button>
 </div>
+<div class="replay-bar" id="replay-bar"><span id="replay-label">回放中</span><div class="replay-progress"><div class="replay-fill" id="replay-fill"></div></div><button class="replay-close" onclick="stopReplay()">✕</button></div>
 
-<!-- DIARY PANEL -->
 <div class="panel" id="panel-diary">
-  <div class="panel-header">
-    <div class="panel-title" id="title-diary">探城日记</div>
-  </div>
-  <div class="panel-body" id="diary-list"></div>
+  <div class="panel-header"><div class="panel-title" id="title-diary">探城日记</div></div>
+  <div class="panel-body"><input class="search-bar" id="search-diary" placeholder="搜索路线…" oninput="renderDiary()"/><div id="diary-list"></div></div>
 </div>
-
-<!-- ROUTES PANEL -->
 <div class="panel" id="panel-routes">
-  <div class="panel-header">
-    <div class="panel-title" id="title-routes">全部路线</div>
-  </div>
-  <div class="panel-body" id="routes-list"></div>
+  <div class="panel-header"><div class="panel-title" id="title-routes">全部路线</div></div>
+  <div class="panel-body"><input class="search-bar" id="search-routes" placeholder="搜索路线…" oninput="renderRoutes()"/><div id="routes-list"></div></div>
 </div>
-
-<!-- ACHIEVEMENTS PANEL -->
+<div class="panel" id="panel-photos">
+  <div class="panel-header"><div class="panel-title" id="title-photos">照片墙</div></div>
+  <div class="panel-body" id="photos-body"></div>
+</div>
 <div class="panel" id="panel-achievements">
-  <div class="panel-header">
-    <div class="panel-title" id="title-achievements">探索成就</div>
-  </div>
-  <div class="panel-body">
-    <div class="stats-grid" id="stats-grid"></div>
-    <div class="achievement-grid" id="achievement-grid"></div>
-  </div>
+  <div class="panel-header"><div class="panel-title" id="title-achievements">探索成就</div></div>
+  <div class="panel-body"><div class="stats-grid" id="stats-grid"></div><div class="achievement-grid" id="achievement-grid"></div></div>
 </div>
-
-<!-- ROUTE DETAIL PANEL -->
 <div class="panel" id="panel-route-detail">
-  <div class="panel-header">
-    <button class="panel-back" onclick="closeRouteDetail()">←</button>
-    <div class="panel-title" id="route-detail-title"></div>
-  </div>
+  <div class="panel-header"><button class="panel-back" onclick="closeRouteDetail()">←</button><div class="panel-title" id="route-detail-title"></div></div>
   <div class="panel-body" id="route-detail-body"></div>
 </div>
 
-<!-- ══ SHEETS ══ -->
-
 <!-- PIN SHEET -->
-<div class="sheet-overlay" id="sheet-pin">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="sheet-pin-title">📍 新标记</div>
-    <div class="sheet-body">
-      <div class="field">
-        <label id="lbl-icon">图标</label>
-        <div class="emoji-grid" id="pin-emoji-grid"></div>
-      </div>
-      <div class="field">
-        <label id="lbl-note">备注（可选）</label>
-        <textarea id="pin-note" placeholder="在这里遇见了什么…"></textarea>
-      </div>
-      <div class="field">
-        <label id="lbl-photo">照片（可选）</label>
-        <img id="pin-photo-preview" class="photo-preview"/>
-        <input type="file" id="pin-photo-input" accept="image/*" style="display:none" onchange="handlePinPhoto(this)"/>
-        <button class="btn-secondary" id="btn-choose-photo" onclick="document.getElementById('pin-photo-input').click()">选择照片</button>
-      </div>
-      <button class="btn-primary" id="btn-save-pin" onclick="savePin()">保存标记</button>
-      <button class="btn-secondary" id="btn-cancel-pin" onclick="closeSheet('sheet-pin')">取消</button>
-    </div>
+<div class="sheet-overlay" id="sheet-pin"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-pin-title">📍 新标记</div>
+  <div class="sheet-body">
+    <div class="field"><label id="lbl-icon">图标</label><div class="emoji-grid" id="pin-emoji-grid"></div></div>
+    <div class="field"><label id="lbl-note">备注（可选）</label><textarea id="pin-note" placeholder="在这里遇见了什么…"></textarea></div>
+    <div class="field"><label id="lbl-photo">照片（可选）</label><img id="pin-photo-preview" class="photo-preview"/><input type="file" id="pin-photo-input" accept="image/*" style="display:none" onchange="handlePinPhoto(this)"/><button class="btn-secondary" id="btn-choose-photo" onclick="document.getElementById('pin-photo-input').click()">选择照片</button></div>
+    <button class="btn-primary" id="btn-save-pin" onclick="savePin()">保存标记</button>
+    <button class="btn-secondary" id="btn-cancel-pin" onclick="closeSheet('sheet-pin')">取消</button>
   </div>
-</div>
+</div></div>
 
-<!-- IMPORT SHEET -->
-<div class="sheet-overlay" id="sheet-import">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="sheet-import-title">导入路线</div>
-    <div class="sheet-body">
-      <div class="import-area" onclick="document.getElementById('gpx-file-input').click()">
-        <div class="import-area-icon">🗺</div>
-        <div class="import-area-text" id="import-hint">点击选择 GPX 文件<br/><small>从 Organic Maps 导出</small></div>
-      </div>
-      <input type="file" id="gpx-file-input" accept=".gpx" style="display:none" onchange="handleGPXFile(this)"/>
-      <div class="field">
-        <label id="lbl-route-name">路线名称</label>
-        <input type="text" id="route-name" placeholder="这次去哪了…"/>
-      </div>
-      <div class="field">
-        <label id="lbl-story">故事（可选）</label>
-        <textarea id="route-story" placeholder="写下这次探城的感受…"></textarea>
-      </div>
-      <div class="field">
-        <label id="lbl-mood">心情</label>
-        <div class="mood-grid" id="route-mood-grid"></div>
-      </div>
-      <div class="field">
-        <label id="lbl-color">路线颜色</label>
-        <div class="color-row" id="route-color-row"></div>
-      </div>
-      <button class="btn-primary" id="btn-save-route" onclick="saveRoute()">保存路线</button>
-      <button class="btn-secondary" id="btn-cancel-route" onclick="closeSheet('sheet-import')">取消</button>
+<!-- IMPORT/EDIT ROUTE SHEET -->
+<div class="sheet-overlay" id="sheet-import"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-import-title">导入路线</div>
+  <div class="sheet-body">
+    <div id="gpx-import-area" class="import-area" onclick="document.getElementById('gpx-file-input').click()">
+      <div class="import-area-icon">🗺</div>
+      <div class="import-area-text" id="import-hint">点击选择 GPX / KML 文件</div>
     </div>
+    <input type="file" id="gpx-file-input" accept=".gpx,.kml" style="display:none" onchange="handleTrackFile(this)"/>
+    <div class="field"><label id="lbl-route-name">路线名称</label><input type="text" id="route-name" placeholder="这次去哪了…"/></div>
+    <div class="field"><label id="lbl-story">故事（可选）</label><textarea id="route-story" placeholder="写下这次探城的感受…"></textarea></div>
+    <div class="field"><label id="lbl-mood">心情</label><div class="mood-grid" id="route-mood-grid"></div></div>
+    <div class="field"><label id="lbl-weather">天气</label><div class="weather-grid" id="route-weather-grid"></div></div>
+    <div class="field"><label id="lbl-tags">标签</label><div class="tag-grid" id="route-tag-grid"></div></div>
+    <div class="field"><label id="lbl-color">路线颜色</label><div class="color-row" id="route-color-row"></div></div>
+    <button class="btn-primary" id="btn-save-route" onclick="saveRoute()">保存路线</button>
+    <button class="btn-secondary" id="btn-cancel-route" onclick="closeSheet('sheet-import')">取消</button>
   </div>
-</div>
+</div></div>
 
 <!-- CITY SHEET -->
-<div class="sheet-overlay" id="sheet-city">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="sheet-city-title">城市</div>
-    <div class="sheet-body">
-      <div id="city-list"></div>
-      <div class="field" style="margin-top:16px">
-        <label id="lbl-new-city">添加新城市</label>
-        <input type="text" id="new-city-input" placeholder="城市名…"/>
-      </div>
-      <button class="btn-primary" id="btn-add-city" onclick="addCity()">添加</button>
-      <button class="btn-secondary" id="btn-done-city" onclick="closeSheet('sheet-city')">完成</button>
-    </div>
+<div class="sheet-overlay" id="sheet-city"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-city-title">城市</div>
+  <div class="sheet-body">
+    <div id="city-list"></div>
+    <div class="field" style="margin-top:16px"><label id="lbl-new-city">添加新城市</label><input type="text" id="new-city-input" placeholder="城市名…"/></div>
+    <button class="btn-primary" id="btn-add-city" onclick="addCity()">添加</button>
+    <button class="btn-secondary" id="btn-done-city" onclick="closeSheet('sheet-city')">完成</button>
   </div>
-</div>
+</div></div>
 
 <!-- SETTINGS SHEET -->
-<div class="sheet-overlay" id="sheet-settings">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="sheet-settings-title">设置</div>
-    <div class="sheet-body">
-      <div class="field">
-        <label id="lbl-lang">语言 / Language</label>
-        <div class="lang-toggle">
-          <button class="lang-btn active" id="lang-zh" onclick="setLang('zh')">中文</button>
-          <button class="lang-btn" id="lang-en" onclick="setLang('en')">English</button>
-        </div>
-      </div>
-      <div class="field">
-        <label id="lbl-theme">主题 / Theme</label>
-        <div class="theme-row">
-          <div class="theme-swatch selected" id="swatch-default" onclick="setTheme('default')">
-            <div class="theme-swatch-dot" style="background:#1C3829"></div>
-            <span id="theme-name-default">深林</span>
-          </div>
-          <div class="theme-swatch" id="swatch-classic" onclick="setTheme('classic')">
-            <div class="theme-swatch-dot" style="background:#2a1f0f"></div>
-            <span id="theme-name-classic">旧墨</span>
-          </div>
-          <div class="theme-swatch" id="swatch-journal" onclick="setTheme('journal')">
-            <div class="theme-swatch-dot" style="background:#f5f0e8"></div>
-            <span id="theme-name-journal">手账</span>
-          </div>
-        </div>
-      </div>
-      <div class="field" style="margin-top:8px">
-        <label id="lbl-backup">数据备份</label>
-        <button class="btn-secondary" id="btn-export" onclick="exportBackup()">📤 导出备份</button>
-        <div class="import-area" style="margin-top:10px" onclick="document.getElementById('restore-input').click()">
-          <div class="import-area-icon">📥</div>
-          <div class="import-area-text" id="restore-hint">点击选择备份文件恢复</div>
-        </div>
-        <input type="file" id="restore-input" accept=".json" style="display:none" onchange="importBackup(this)"/>
-      </div>
-      <button class="btn-secondary" id="btn-close-settings" onclick="closeSheet('sheet-settings')">关闭</button>
-      <div style="text-align:center;margin-top:20px;font-size:11px;color:var(--text-dim);opacity:0.5;letter-spacing:0.06em">
-        WithMe v0.2.1
-      </div>
-    </div>
+<div class="sheet-overlay" id="sheet-settings"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-settings-title">设置</div>
+  <div class="sheet-body">
+    <div class="field"><label id="lbl-lang">语言 / Language</label><div class="lang-toggle"><button class="lang-btn active" id="lang-zh" onclick="setLang('zh')">中文</button><button class="lang-btn" id="lang-en" onclick="setLang('en')">English</button></div></div>
+    <div class="field"><label id="lbl-theme">主题 / Theme</label><div class="theme-row"><div class="theme-swatch selected" id="swatch-default" onclick="setTheme('default')"><div class="theme-swatch-dot" style="background:#1C3829"></div><span id="theme-name-default">深林</span></div><div class="theme-swatch" id="swatch-classic" onclick="setTheme('classic')"><div class="theme-swatch-dot" style="background:#2a1f0f"></div><span id="theme-name-classic">旧墨</span></div><div class="theme-swatch" id="swatch-journal" onclick="setTheme('journal')"><div class="theme-swatch-dot" style="background:#f5f0e8"></div><span id="theme-name-journal">手账</span></div></div></div>
+    <div class="field"><label id="lbl-signature">明信片署名</label><input type="text" id="signature-input" placeholder="你的名字…" oninput="saveSignature()"/></div>
+    <div class="field" style="margin-top:8px"><label id="lbl-backup">数据备份</label><button class="btn-secondary" id="btn-export" onclick="exportBackup()">📤 导出备份</button><div class="import-area" style="margin-top:10px" onclick="document.getElementById('restore-input').click()"><div class="import-area-icon">📥</div><div class="import-area-text" id="restore-hint">点击选择备份文件恢复</div></div><input type="file" id="restore-input" accept=".json" style="display:none" onchange="importBackup(this)"/></div>
+    <button class="btn-secondary" id="btn-close-settings" onclick="closeSheet('sheet-settings')">关闭</button>
+    <div style="text-align:center;margin-top:20px;font-size:11px;color:var(--text-dim);opacity:.5;letter-spacing:.06em">WithMe v0.5.0</div>
   </div>
-</div>
+</div></div>
 
 <!-- PIN DETAIL SHEET -->
-<div class="sheet-overlay" id="sheet-pin-detail">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-title" id="pin-detail-title">标记详情</div>
-    <div class="sheet-body" id="pin-detail-body"></div>
+<div class="sheet-overlay" id="sheet-pin-detail"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="pin-detail-title">标记详情</div>
+  <div class="sheet-body" id="pin-detail-body"></div>
+</div></div>
+
+<!-- POSTCARD SHEET -->
+<div class="sheet-overlay" id="sheet-postcard"><div class="sheet"><div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheet-postcard-title">旅行明信片</div>
+  <div class="sheet-body">
+    <div id="postcard-container" style="padding:20px;background:var(--bg);border-radius:16px;margin-bottom:16px">
+      <div id="postcard-inner" style="background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--border)">
+        <canvas id="postcard-canvas" width="600" height="400"></canvas>
+        <div style="padding:16px">
+          <div id="pc-name" style="font-family:var(--font-display);font-size:20px;font-weight:600"></div>
+          <div id="pc-date" style="font-size:12px;color:var(--text-dim);margin-top:4px"></div>
+          <div id="pc-story" style="font-size:13px;color:var(--text-dim);margin-top:8px;line-height:1.6"></div>
+          <div id="pc-meta" style="font-size:12px;color:var(--text-dim);margin-top:8px;display:flex;gap:12px"></div>
+          <div id="pc-sig" style="font-size:11px;color:var(--gold);margin-top:12px;text-align:right;font-style:italic"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-primary" id="btn-save-postcard" onclick="savePostcard()">💾 保存图片</button>
+    <button class="btn-secondary" onclick="closeSheet('sheet-postcard')">关闭</button>
   </div>
-</div>
+</div></div>
 
-<!-- ACHIEVEMENT POPUP -->
-<div id="ach-popup">
-  <div id="ach-popup-icon">🏅</div>
-  <div id="ach-popup-label">成就解锁</div>
-  <div id="ach-popup-name"></div>
-  <div id="ach-popup-desc"></div>
-</div>
+<!-- PHOTO VIEWER -->
+<div class="sheet-overlay" id="sheet-photo-view"><div class="sheet" style="max-height:95dvh"><div class="sheet-handle"></div>
+  <div class="sheet-body" style="padding:0;display:flex;align-items:center;justify-content:center;background:#000">
+    <img id="photo-view-img" style="max-width:100%;max-height:75dvh;object-fit:contain"/>
+  </div>
+  <div style="padding:12px 20px"><button class="btn-secondary" onclick="closeSheet('sheet-photo-view')">关闭</button></div>
+</div></div>
 
+<div id="ach-popup"><div id="ach-popup-icon">🏅</div><div id="ach-popup-label">成就解锁</div><div id="ach-popup-name"></div><div id="ach-popup-desc"></div></div>
 <div id="toast"></div>
 
 <script>
-// ══════════════════════════════════════
-// CONSTANTS
-// ══════════════════════════════════════
-const VERSION = 'v0.2.1';
-const PIN_EMOJIS = ['🐱','🍜','🌸','☕','🎨','🚪','🌤','👤','🌿','⭐','🏮','💧','🦋','🎵','🛖','🪨'];
-const MOODS = ['😊','🥰','😌','🤩','😢','😤','🫠','🌙'];
-const ROUTE_COLORS = ['#C9A96E','#7EC8A0','#7EB8C9','#C97E7E','#B07EC9','#C9B87E'];
+const VERSION='v0.5.0';
+const PIN_EMOJIS=['🐱','🍜','🌸','☕','🎨','🚪','🌤','👤','🌿','⭐','🏮','💧','🦋','🎵','🛖','🪨'];
+const MOODS=['😊','🥰','😌','🤩','😢','😤','🫠','🌙'];
+const WEATHERS=['☀️','🌤','⛅','🌧','❄️','💨','🌫','🌈'];
+const TAGS_ZH=['美食','逛街','夜游','自然','文化','随意'];
+const TAGS_EN=['Food','Shopping','Night','Nature','Culture','Random'];
+const ROUTE_COLORS=['#C9A96E','#7EC8A0','#7EB8C9','#C97E7E','#B07EC9','#C9B87E'];
+let currentLang='zh',currentTheme='default';
+let map,pendingPinLatLng=null,selectedEmoji='📍',selectedMood='😊',selectedWeather='',selectedTags=[];
+let pendingGPXData=null,pendingPinPhoto=null,selectedRouteColor='#C9A96E';
+let editingPinId=null,editingRouteId=null;
+let locateMarker=null,heatmapOn=false,heatCircles=[];
+let replayTimer=null;
 
 // ── I18N ──
-const T = {
-  zh: {
-    selectCity: '选择城市',
-    diary: '探城日记', routes: '全部路线', achievements: '探索成就', map: '地图',
-    newPin: '📍 新标记', importRoute: '导入路线', cityTitle: '城市', settings: '设置',
-    icon: '图标', note: '备注（可选）', photo: '照片（可选）',
-    choosePhoto: '选择照片', savePin: '保存标记', cancel: '取消',
-    routeName: '路线名称', story: '故事（可选）', mood: '心情', color: '路线颜色',
-    saveRoute: '保存路线', addCity: '添加新城市', add: '添加', done: '完成',
-    lang: '语言 / Language', theme: '主题 / Theme', backup: '数据备份',
-    exportBackup: '📤 导出备份', restoreHint: '点击选择备份文件恢复',
-    closeSettings: '关闭',
-    themeDefault: '深林', themeClassic: '旧墨', themeJournal: '手账',
-    importHint: '点击选择 GPX 文件',
-    importSub: '从 Organic Maps 导出',
-    routeNamePlaceholder: '这次去哪了…',
-    storyPlaceholder: '写下这次探城的感受…',
-    cityPlaceholder: '城市名…',
-    notePlaceholder: '在这里遇见了什么…',
-    pinSaved: '标记已保存', routeSaved: '路线已保存 ✦',
-    routeDeleted: '路线已删除', pinDeleted: '标记已删除',
-    selectCityFirst: '请先选择城市', enterRouteName: '请输入路线名称',
-    cityExists: '城市已存在', cityAdded: '已添加',
-    switchedTo: '切换到', trackPoints: '个轨迹点',
-    backupExported: '备份已导出', backupRestored: '备份已恢复，刷新页面生效',
-    backupInvalid: '备份文件无效',
-    viewOnMap: '在地图上查看', deleteRoute: '删除路线', deletePin: '删除标记', close: '关闭',
-    noPins: '本次路线暂无标记', noNote: '无备注',
-    emptyDiary: '还没有探城记录\n导入 GPX 开始你的第一次',
-    emptyRoutes: '还没有路线\n点击右上角 ＋ 导入 GPX',
-    emptyCity: '还没有城市，添加一个吧',
-    confirmDelete: '确定删除这条路线？',
-    tapMapPin: '点击地图选择标记位置',
-    achUnlocked: '成就解锁',
-    totalKm: '总公里数', totalRoutes: '路线数', totalPins: '标记数', totalCities: '城市数',
-    pinLabel: '标记', pinsLabel: '标记',
-  },
-  en: {
-    selectCity: 'Select City',
-    diary: 'Journal', routes: 'Routes', achievements: 'Achievements', map: 'Map',
-    newPin: '📍 New Pin', importRoute: 'Import Route', cityTitle: 'Cities', settings: 'Settings',
-    icon: 'Icon', note: 'Note (optional)', photo: 'Photo (optional)',
-    choosePhoto: 'Choose Photo', savePin: 'Save Pin', cancel: 'Cancel',
-    routeName: 'Route Name', story: 'Story (optional)', mood: 'Mood', color: 'Route Color',
-    saveRoute: 'Save Route', addCity: 'Add New City', add: 'Add', done: 'Done',
-    lang: 'Language / 语言', theme: 'Theme / 主题', backup: 'Data Backup',
-    exportBackup: '📤 Export Backup', restoreHint: 'Tap to restore from backup file',
-    closeSettings: 'Close',
-    themeDefault: 'Forest', themeClassic: 'Ink', themeJournal: 'Journal',
-    importHint: 'Tap to select GPX file',
-    importSub: 'Exported from Organic Maps',
-    routeNamePlaceholder: 'Where did you go…',
-    storyPlaceholder: 'Write about this walk…',
-    cityPlaceholder: 'City name…',
-    notePlaceholder: 'What did you find here…',
-    pinSaved: 'Pin saved', routeSaved: 'Route saved ✦',
-    routeDeleted: 'Route deleted', pinDeleted: 'Pin deleted',
-    selectCityFirst: 'Please select a city first', enterRouteName: 'Please enter a route name',
-    cityExists: 'City already exists', cityAdded: 'Added',
-    switchedTo: 'Switched to', trackPoints: 'track points',
-    backupExported: 'Backup exported', backupRestored: 'Backup restored, please refresh',
-    backupInvalid: 'Invalid backup file',
-    viewOnMap: 'View on Map', deleteRoute: 'Delete Route', deletePin: 'Delete Pin', close: 'Close',
-    noPins: 'No pins on this route', noNote: 'No note',
-    emptyDiary: 'No walks recorded yet\nImport a GPX to begin',
-    emptyRoutes: 'No routes yet\nTap ＋ to import GPX',
-    emptyCity: 'No cities yet, add one',
-    confirmDelete: 'Delete this route?',
-    tapMapPin: 'Tap the map to place your pin',
-    achUnlocked: 'Achievement Unlocked',
-    totalKm: 'Total km', totalRoutes: 'Routes', totalPins: 'Pins', totalCities: 'Cities',
-    pinLabel: 'pin', pinsLabel: 'pins',
-  }
+const T={
+zh:{selectCity:'选择城市',diary:'探城日记',routes:'全部路线',achievements:'探索成就',map:'地图',photos:'相册',
+newPin:'📍 新标记',editPin:'📍 编辑标记',importRoute:'导入路线',editRoute:'编辑路线',cityTitle:'城市',settings:'设置',
+icon:'图标',note:'备注（可选）',photo:'照片（可选）',choosePhoto:'选择照片',savePin:'保存标记',cancel:'取消',
+routeName:'路线名称',story:'故事（可选）',mood:'心情',weather:'天气',tags:'标签',color:'路线颜色',
+saveRoute:'保存路线',updateRoute:'更新路线',addCity:'添加新城市',add:'添加',done:'完成',
+lang:'语言 / Language',theme:'主题 / Theme',backup:'数据备份',signature:'明信片署名',sigPlaceholder:'你的名字…',
+exportBackup:'📤 导出备份',restoreHint:'点击选择备份文件恢复',closeSettings:'关闭',
+themeDefault:'深林',themeClassic:'旧墨',themeJournal:'手账',
+importHint:'点击选择 GPX / KML 文件',importSub:'从 Organic Maps 导出',
+routeNamePlaceholder:'这次去哪了…',storyPlaceholder:'写下这次探城的感受…',cityPlaceholder:'城市名…',notePlaceholder:'在这里遇见了什么…',
+pinSaved:'标记已保存',pinUpdated:'标记已更新',routeSaved:'路线已保存 ✦',routeUpdated:'路线已更新',
+routeDeleted:'路线已删除',pinDeleted:'标记已删除',selectCityFirst:'请先选择城市',enterRouteName:'请输入路线名称',
+cityExists:'城市已存在',cityAdded:'已添加',cityDeleted:'城市已删除',switchedTo:'切换到',trackPoints:'个轨迹点',
+backupExported:'备份已导出',backupRestored:'备份已恢复，刷新页面生效',backupInvalid:'备份文件无效',
+viewOnMap:'在地图上查看',deleteRoute:'删除路线',deletePin:'删除标记',editBtn:'编辑',close:'关闭',
+noPins:'本次路线暂无标记',noNote:'无备注',emptyDiary:'还没有探城记录\n导入 GPX 开始你的第一次',
+emptyRoutes:'还没有路线\n点击右上角 ＋ 导入 GPX',emptyCity:'还没有城市，添加一个吧',emptyPhotos:'还没有照片',
+confirmDelete:'确定删除这条路线？',confirmDeleteCity:'确定删除这个城市及其所有数据？',tapMapPin:'点击地图选择标记位置',
+achUnlocked:'成就解锁',totalKm:'总公里数',totalRoutes:'路线数',totalPins:'标记数',totalCities:'城市数',
+searchPlaceholder:'搜索路线…',replay:'路线回放',replayLabel:'回放中',postcard:'旅行明信片',saveImage:'💾 保存图片',
+locating:'定位中…',located:'已定位',locateFail:'定位失败',heatmapOn:'热力图已开',heatmapOff:'热力图已关'},
+en:{selectCity:'Select City',diary:'Journal',routes:'Routes',achievements:'Achievements',map:'Map',photos:'Photos',
+newPin:'📍 New Pin',editPin:'📍 Edit Pin',importRoute:'Import Route',editRoute:'Edit Route',cityTitle:'Cities',settings:'Settings',
+icon:'Icon',note:'Note (optional)',photo:'Photo (optional)',choosePhoto:'Choose Photo',savePin:'Save Pin',cancel:'Cancel',
+routeName:'Route Name',story:'Story (optional)',mood:'Mood',weather:'Weather',tags:'Tags',color:'Route Color',
+saveRoute:'Save Route',updateRoute:'Update Route',addCity:'Add New City',add:'Add',done:'Done',
+lang:'Language / 语言',theme:'Theme / 主题',backup:'Data Backup',signature:'Postcard Signature',sigPlaceholder:'Your name…',
+exportBackup:'📤 Export Backup',restoreHint:'Tap to restore from backup file',closeSettings:'Close',
+themeDefault:'Forest',themeClassic:'Ink',themeJournal:'Journal',
+importHint:'Tap to select GPX / KML file',importSub:'Exported from Organic Maps',
+routeNamePlaceholder:'Where did you go…',storyPlaceholder:'Write about this walk…',cityPlaceholder:'City name…',notePlaceholder:'What did you find here…',
+pinSaved:'Pin saved',pinUpdated:'Pin updated',routeSaved:'Route saved ✦',routeUpdated:'Route updated',
+routeDeleted:'Route deleted',pinDeleted:'Pin deleted',selectCityFirst:'Please select a city first',enterRouteName:'Please enter a route name',
+cityExists:'City already exists',cityAdded:'Added',cityDeleted:'City deleted',switchedTo:'Switched to',trackPoints:'track points',
+backupExported:'Backup exported',backupRestored:'Backup restored, please refresh',backupInvalid:'Invalid backup file',
+viewOnMap:'View on Map',deleteRoute:'Delete Route',deletePin:'Delete Pin',editBtn:'Edit',close:'Close',
+noPins:'No nearby pins',noNote:'No note',emptyDiary:'No walks yet\nImport GPX to begin',
+emptyRoutes:'No routes yet\nTap ＋ to import GPX',emptyCity:'No cities yet',emptyPhotos:'No photos yet',
+confirmDelete:'Delete this route?',confirmDeleteCity:'Delete this city and all its data?',tapMapPin:'Tap the map to place your pin',
+achUnlocked:'Achievement Unlocked',totalKm:'Total km',totalRoutes:'Routes',totalPins:'Pins',totalCities:'Cities',
+searchPlaceholder:'Search routes…',replay:'Route Replay',replayLabel:'Replaying',postcard:'Travel Postcard',saveImage:'💾 Save Image',
+locating:'Locating…',located:'Located',locateFail:'Location failed',heatmapOn:'Heatmap on',heatmapOff:'Heatmap off'}
 };
+function t(k){return(T[currentLang]||T.zh)[k]||k}
 
-// ── ACHIEVEMENTS DEFINITION ──
-const ACHIEVEMENTS = [
-  // Milestones
-  { id: 'first_walk',   icon: '🌱', name_zh: '第一步',     name_en: 'First Step',       desc_zh: '完成第一次探城',          desc_en: 'Complete your first walk',          check: d => d.routes.length >= 1 },
-  { id: 'five_routes',  icon: '🗺',  name_zh: '地图收藏家', name_en: 'Map Collector',    desc_zh: '记录了五条路线',           desc_en: 'Record 5 routes',                   check: d => d.routes.length >= 5 },
-  { id: 'ten_routes',   icon: '🧭',  name_zh: '城市行者',   name_en: 'Urban Wanderer',   desc_zh: '记录了十条路线',           desc_en: 'Record 10 routes',                  check: d => d.routes.length >= 10 },
-  { id: 'first_pin',    icon: '📍',  name_zh: '留下痕迹',   name_en: 'Leaving Traces',   desc_zh: '添加了第一个标记',         desc_en: 'Add your first pin',                check: d => d.pins.length >= 1 },
-  { id: 'cat_finder',   icon: '🐱',  name_zh: '寻猫使者',   name_en: 'Cat Whisperer',    desc_zh: '标记了三只猫',            desc_en: 'Mark 3 cats',                       check: d => d.pins.filter(p=>p.emoji==='🐱').length >= 3 },
-  { id: 'ten_km',       icon: '👟',  name_zh: '铁脚板',     name_en: 'Iron Feet',        desc_zh: '累计行走超过10公里',       desc_en: 'Walk more than 10 km total',        check: d => totalKm(d) >= 10 },
-  { id: 'fifty_km',     icon: '🏃',  name_zh: '城市马拉松', name_en: 'City Marathon',    desc_zh: '累计行走超过50公里',       desc_en: 'Walk more than 50 km total',        check: d => totalKm(d) >= 50 },
-  { id: 'two_cities',   icon: '✈️',  name_zh: '双城记',     name_en: 'Two Cities',       desc_zh: '探索了两座城市',           desc_en: 'Explore 2 cities',                  check: d => d.cities.length >= 2 },
-  { id: 'night_owl',    icon: '🌙',  name_zh: '夜游者',     name_en: 'Night Owl',        desc_zh: '在夜晚心情下记录过路线',   desc_en: 'Log a route with 🌙 mood',         check: d => d.routes.some(r=>r.mood==='🌙') },
-  { id: 'storyteller',  icon: '📖',  name_zh: '说故事的人', name_en: 'Storyteller',      desc_zh: '为五条路线写了故事',       desc_en: 'Write stories for 5 routes',        check: d => d.routes.filter(r=>r.story&&r.story.length>10).length >= 5 },
-  // Gentle quirky
-  { id: 'lost_maybe',   icon: '🫠',  name_zh: '也许迷路了', name_en: 'Maybe Lost',       desc_zh: '添加了10个标记，走走停停真好', desc_en: '10 pins — stopping to notice things', check: d => d.pins.length >= 10 },
-  { id: 'rainy_day',    icon: '☔',  name_zh: '雨天也出门', name_en: 'Rainy Day Walker', desc_zh: '用😢心情记录了一次路线',   desc_en: 'Log a route with 😢 mood',         check: d => d.routes.some(r=>r.mood==='😢') },
-  { id: 'collector',    icon: '🌿',  name_zh: '收集绿色',   name_en: 'Green Collector',  desc_zh: '标记了三棵植物或自然',     desc_en: 'Mark 3 plants or nature spots',     check: d => d.pins.filter(p=>p.emoji==='🌿').length >= 3 },
-  { id: 'foodie',       icon: '🍜',  name_zh: '城市觅食者', name_en: 'City Foodie',      desc_zh: '标记了五个吃的地方',       desc_en: 'Mark 5 food spots',                 check: d => d.pins.filter(p=>p.emoji==='🍜').length >= 5 },
+const ACHIEVEMENTS=[
+{id:'first_walk',icon:'🌱',name_zh:'第一步',name_en:'First Step',desc_zh:'完成第一次探城',desc_en:'Complete your first walk',check:d=>d.routes.length>=1},
+{id:'five_routes',icon:'🗺',name_zh:'地图收藏家',name_en:'Map Collector',desc_zh:'记录了五条路线',desc_en:'Record 5 routes',check:d=>d.routes.length>=5},
+{id:'ten_routes',icon:'🧭',name_zh:'城市行者',name_en:'Urban Wanderer',desc_zh:'记录了十条路线',desc_en:'Record 10 routes',check:d=>d.routes.length>=10},
+{id:'first_pin',icon:'📍',name_zh:'留下痕迹',name_en:'Leaving Traces',desc_zh:'添加了第一个标记',desc_en:'Add your first pin',check:d=>d.pins.length>=1},
+{id:'cat_finder',icon:'🐱',name_zh:'寻猫使者',name_en:'Cat Whisperer',desc_zh:'标记了三只猫',desc_en:'Mark 3 cats',check:d=>d.pins.filter(p=>p.emoji==='🐱').length>=3},
+{id:'ten_km',icon:'👟',name_zh:'铁脚板',name_en:'Iron Feet',desc_zh:'累计行走超过10公里',desc_en:'Walk more than 10 km',check:d=>tkm(d)>=10},
+{id:'fifty_km',icon:'🏃',name_zh:'城市马拉松',name_en:'City Marathon',desc_zh:'累计行走超过50公里',desc_en:'Walk more than 50 km',check:d=>tkm(d)>=50},
+{id:'two_cities',icon:'✈️',name_zh:'双城记',name_en:'Two Cities',desc_zh:'探索了两座城市',desc_en:'Explore 2 cities',check:d=>d.cities.length>=2},
+{id:'night_owl',icon:'🌙',name_zh:'夜游者',name_en:'Night Owl',desc_zh:'在夜晚心情下记录过路线',desc_en:'Log a route with 🌙 mood',check:d=>d.routes.some(r=>r.mood==='🌙')},
+{id:'storyteller',icon:'📖',name_zh:'说故事的人',name_en:'Storyteller',desc_zh:'为五条路线写了故事',desc_en:'Write stories for 5 routes',check:d=>d.routes.filter(r=>r.story&&r.story.length>10).length>=5},
+{id:'lost_maybe',icon:'🫠',name_zh:'也许迷路了',name_en:'Maybe Lost',desc_zh:'添加了10个标记，走走停停真好',desc_en:'10 pins — stopping to notice things',check:d=>d.pins.length>=10},
+{id:'rainy_day',icon:'☔',name_zh:'雨天也出门',name_en:'Rainy Day Walker',desc_zh:'在🌧天气下记录了一次路线',desc_en:'Log a route with 🌧 weather',check:d=>d.routes.some(r=>r.weather==='🌧')},
+{id:'collector',icon:'🌿',name_zh:'收集绿色',name_en:'Green Collector',desc_zh:'标记了三棵植物或自然',desc_en:'Mark 3 nature spots',check:d=>d.pins.filter(p=>p.emoji==='🌿').length>=3},
+{id:'foodie',icon:'🍜',name_zh:'城市觅食者',name_en:'City Foodie',desc_zh:'标记了五个吃的地方',desc_en:'Mark 5 food spots',check:d=>d.pins.filter(p=>p.emoji==='🍜').length>=5},
+{id:'photographer',icon:'📸',name_zh:'影像记录者',name_en:'Photographer',desc_zh:'上传了10张照片',desc_en:'Upload 10 photos',check:d=>d.pins.filter(p=>p.hasPhoto).length>=10},
+{id:'rainbow',icon:'🌈',name_zh:'集齐天气',name_en:'Weather Collector',desc_zh:'在三种不同天气下记录路线',desc_en:'Log routes in 3 different weathers',check:d=>new Set(d.routes.map(r=>r.weather).filter(Boolean)).size>=3},
 ];
+function tkm(d){return d.routes.reduce((s,r)=>s+(parseFloat(r.km)||0),0)}
 
-function totalKm(d) {
-  return d.routes.reduce((sum, r) => sum + (parseFloat(r.km)||0), 0);
-}
+// ── IndexedDB ──
+const DBNAME='withme-photos';
+let photoDB=null;
+function openPhotoDB(){return new Promise((res,rej)=>{if(photoDB)return res(photoDB);const req=indexedDB.open(DBNAME,1);req.onupgradeneeded=e=>{e.target.result.createObjectStore('photos')};req.onsuccess=e=>{photoDB=e.target.result;res(photoDB)};req.onerror=()=>rej()})}
+async function savePhoto(id,data){const db=await openPhotoDB();return new Promise((res,rej)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').put(data,id);tx.oncomplete=()=>res();tx.onerror=()=>rej()})}
+async function getPhoto(id){const db=await openPhotoDB();return new Promise((res)=>{const tx=db.transaction('photos','readonly');const req=tx.objectStore('photos').get(id);req.onsuccess=()=>res(req.result||null);req.onerror=()=>res(null)})}
+async function deletePhoto(id){const db=await openPhotoDB();return new Promise((res)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').delete(id);tx.oncomplete=()=>res();tx.onerror=()=>res()})}
+async function getAllPhotos(){const db=await openPhotoDB();return new Promise((res)=>{const tx=db.transaction('photos','readonly');const req=tx.objectStore('photos').getAll();const reqK=tx.objectStore('photos').getAllKeys();let vals,keys;req.onsuccess=()=>{vals=req.result};reqK.onsuccess=()=>{keys=reqK.result};tx.oncomplete=()=>{const r={};keys.forEach((k,i)=>r[k]=vals[i]);res(r)};tx.onerror=()=>res({})})}
 
-// ══════════════════════════════════════
-// STATE
-// ══════════════════════════════════════
-let map, pendingPinLatLng = null, selectedEmoji = '📍', selectedMood = '😊';
-let pendingGPXData = null, pendingPinPhoto = null, selectedRouteColor = '#C9A96E';
-let currentLang = 'zh', currentTheme = 'default';
+// ── STORAGE ──
+function getData(){try{return JSON.parse(localStorage.getItem('withme_data')||'{"cities":[],"routes":[],"pins":[],"activeCity":null,"unlockedAch":[],"achDates":{}}');}catch{return{cities:[],routes:[],pins:[],activeCity:null,unlockedAch:[],achDates:{}}}}
+function saveData(d){localStorage.setItem('withme_data',JSON.stringify(d))}
+function getPrefs(){try{return JSON.parse(localStorage.getItem('withme_prefs')||'{"lang":"zh","theme":"default","signature":""}');}catch{return{lang:'zh',theme:'default',signature:''}}}
+function savePrefs(p){localStorage.setItem('withme_prefs',JSON.stringify(p))}
 
-// ══════════════════════════════════════
-// STORAGE
-// ══════════════════════════════════════
-function getData() {
-  try { return JSON.parse(localStorage.getItem('withme_data') || '{"cities":[],"routes":[],"pins":[],"activeCity":null,"unlockedAch":[]}'); }
-  catch { return { cities: [], routes: [], pins: [], activeCity: null, unlockedAch: [] }; }
-}
-function saveData(d) { localStorage.setItem('withme_data', JSON.stringify(d)); }
-function getPrefs() {
-  try { return JSON.parse(localStorage.getItem('withme_prefs') || '{"lang":"zh","theme":"default"}'); }
-  catch { return { lang: 'zh', theme: 'default' }; }
-}
-function savePrefs(p) { localStorage.setItem('withme_prefs', JSON.stringify(p)); }
-
-// ══════════════════════════════════════
-// INIT
-// ══════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  const prefs = getPrefs();
-  currentLang = prefs.lang || 'zh';
-  currentTheme = prefs.theme || 'default';
-  applyTheme(currentTheme, false);
-  applyLang(currentLang);
-  initMap();
-  buildEmojiGrid(); buildMoodGrid(); buildColorRow();
-  loadMapData();
-  checkAchievements(false);
+// ── INIT ──
+document.addEventListener('DOMContentLoaded',async()=>{
+  const p=getPrefs();currentLang=p.lang||'zh';currentTheme=p.theme||'default';
+  document.getElementById('signature-input').value=p.signature||'';
+  applyTheme(currentTheme);applyLang(currentLang);
+  initMap();buildEmojiGrid();buildMoodGrid();buildWeatherGrid();buildTagGrid();buildColorRow();
+  await migratePhotos();loadMapData();checkAchievements(false);
 });
 
-function t(key) { return (T[currentLang] || T.zh)[key] || key; }
-
-// ══════════════════════════════════════
-// MAP
-// ══════════════════════════════════════
-function initMap() {
-  map = L.map('map', { zoomControl: false, attributionControl: true }).setView([30.5728, 104.0668], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap', maxZoom: 19,
-  }).addTo(map);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
-  map.on('click', onMapClick);
-}
-
-function loadMapData() {
-  const d = getData();
-  document.getElementById('city-name-display').textContent = d.activeCity || t('selectCity');
-  d.routes.filter(r => r.city === d.activeCity).forEach(drawRoute);
-  d.pins.filter(p => p.city === d.activeCity).forEach(drawPin);
-}
-
-function clearMapLayers() {
-  map.eachLayer(l => {
-    if (l instanceof L.Polyline || l instanceof L.CircleMarker || l instanceof L.Marker) map.removeLayer(l);
-  });
-}
-
-let pinMode = false;
-function startPinMode() {
-  if (!getData().activeCity) { toast(t('selectCityFirst')); return; }
-  pinMode = true;
-  document.getElementById('fab').textContent = '✕';
-  document.getElementById('fab').onclick = cancelPinMode;
-  toast(t('tapMapPin'));
-}
-function cancelPinMode() {
-  pinMode = false;
-  document.getElementById('fab').textContent = '📍';
-  document.getElementById('fab').onclick = startPinMode;
-}
-
-function onMapClick(e) {
-  if (!pinMode) return;
-  pendingPinLatLng = e.latlng;
-  cancelPinMode();
-  document.getElementById('sheet-pin-title').textContent = t('newPin');
-  openSheet('sheet-pin');
-}
-
-function drawRoute(route) {
-  if (!route.coords || route.coords.length === 0) return;
-  const color = route.color || '#C9A96E';
-  const poly = L.polyline(route.coords, { color, weight: 3, opacity: 0.85 }).addTo(map);
-  poly.on('click', () => openRouteDetail(route.id));
-  if (route.coords.length > 0) {
-    L.circleMarker(route.coords[0], { radius: 5, color, fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
-    L.circleMarker(route.coords[route.coords.length-1], { radius: 7, color, fillColor: 'var(--bg)', fillOpacity: 1, weight: 2 }).addTo(map);
+async function migratePhotos(){
+  const d=getData();let changed=false;
+  for(const pin of d.pins){
+    if(pin.photo&&!pin.hasPhoto){
+      await savePhoto(pin.id,pin.photo);
+      delete pin.photo;pin.hasPhoto=true;changed=true;
+    }
   }
+  if(changed)saveData(d);
 }
 
-function drawPin(pin) {
-  const icon = L.divIcon({
-    html: `<div class="pin-marker" style="background:${pin.color||'#1C3829'}"><span class="pin-inner">${pin.emoji||'📍'}</span></div>`,
-    className: '', iconSize: [36,36], iconAnchor: [18,36],
-  });
-  L.marker([pin.lat, pin.lng], { icon }).addTo(map).on('click', () => openPinDetail(pin.id));
+function t(k){return(T[currentLang]||T.zh)[k]||k}
+
+// ── MAP ──
+function initMap(){
+  map=L.map('map',{zoomControl:false,attributionControl:true}).setView([30.5728,104.0668],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  map.on('click',onMapClick);
+}
+function loadMapData(){
+  const d=getData();
+  document.getElementById('city-name-display').textContent=d.activeCity||t('selectCity');
+  d.routes.filter(r=>r.city===d.activeCity).forEach(drawRoute);
+  d.pins.filter(p=>p.city===d.activeCity).forEach(drawPin);
+}
+function clearMapLayers(){map.eachLayer(l=>{if(l instanceof L.Polyline||l instanceof L.CircleMarker||l instanceof L.Marker)map.removeLayer(l)})}
+
+let pinMode=false;
+function startPinMode(){if(!getData().activeCity){toast(t('selectCityFirst'));return}pinMode=true;document.getElementById('fab').textContent='✕';document.getElementById('fab').onclick=cancelPinMode;toast(t('tapMapPin'))}
+function cancelPinMode(){pinMode=false;document.getElementById('fab').textContent='📍';document.getElementById('fab').onclick=startPinMode}
+function onMapClick(e){if(!pinMode)return;pendingPinLatLng=e.latlng;cancelPinMode();editingPinId=null;document.getElementById('sheet-pin-title').textContent=t('newPin');document.getElementById('btn-save-pin').textContent=t('savePin');openSheet('sheet-pin')}
+
+function locateMe(){
+  if(!navigator.geolocation){toast(t('locateFail'));return}
+  toast(t('locating'));
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat,longitude:lng}=pos.coords;map.setView([lat,lng],17);
+    if(locateMarker)map.removeLayer(locateMarker);
+    locateMarker=L.circleMarker([lat,lng],{radius:8,color:'#4A90D9',fillColor:'#4A90D9',fillOpacity:.9,weight:3}).addTo(map);
+    toast(t('located'));
+  },()=>toast(t('locateFail')),{enableHighAccuracy:true,timeout:10000});
 }
 
-// ══════════════════════════════════════
-// GPX
-// ══════════════════════════════════════
-function parseGPX(text) {
-  const xml = new DOMParser().parseFromString(text, 'application/xml');
-  const coords = [];
-  xml.querySelectorAll('trkpt').forEach(pt => {
-    const lat = parseFloat(pt.getAttribute('lat'));
-    const lon = parseFloat(pt.getAttribute('lon'));
-    if (!isNaN(lat) && !isNaN(lon)) coords.push([lat, lon]);
-  });
-  return coords;
+function drawRoute(route){
+  if(!route.coords||!route.coords.length)return;
+  const c=route.color||'#C9A96E';
+  const poly=L.polyline(route.coords,{color:c,weight:3,opacity:.85}).addTo(map);
+  poly.on('click',()=>openRouteDetail(route.id));
+  L.circleMarker(route.coords[0],{radius:5,color:c,fillColor:c,fillOpacity:1,weight:2}).addTo(map);
+  L.circleMarker(route.coords[route.coords.length-1],{radius:7,color:c,fillColor:'#1C3829',fillOpacity:1,weight:2}).addTo(map);
+}
+function drawPin(pin){
+  const icon=L.divIcon({html:'<div class="pin-marker" style="background:'+(pin.color||'#1C3829')+'"><span class="pin-inner">'+(pin.emoji||'📍')+'</span></div>',className:'',iconSize:[36,36],iconAnchor:[18,36]});
+  L.marker([pin.lat,pin.lng],{icon}).addTo(map).on('click',()=>openPinDetail(pin.id));
 }
 
-function handleGPXFile(input) {
-  const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    pendingGPXData = parseGPX(e.target.result);
-    if (pendingGPXData.length > 0) {
-      toast(`✓ ${pendingGPXData.length} ${t('trackPoints')}`);
-      document.getElementById('route-name').value = file.name.replace('.gpx','').replace(/_/g,' ');
-    } else { toast('未找到轨迹数据'); }
-  };
-  reader.readAsText(file);
+// ── PARSE GPX/KML ──
+function parseGPX(text){const xml=new DOMParser().parseFromString(text,'application/xml');const c=[];xml.querySelectorAll('trkpt').forEach(p=>{const la=parseFloat(p.getAttribute('lat')),lo=parseFloat(p.getAttribute('lon'));if(!isNaN(la)&&!isNaN(lo))c.push([la,lo])});return c}
+function parseKML(text){const xml=new DOMParser().parseFromString(text,'application/xml');const c=[];xml.querySelectorAll('coordinates').forEach(el=>{el.textContent.trim().split(/\s+/).forEach(s=>{const[lon,lat]=s.split(',').map(Number);if(!isNaN(lat)&&!isNaN(lon))c.push([lat,lon])})});return c}
+function handleTrackFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const txt=e.target.result;
+    pendingGPXData=file.name.endsWith('.kml')?parseKML(txt):parseGPX(txt);
+    if(pendingGPXData.length>0){toast('✓ '+pendingGPXData.length+' '+t('trackPoints'));document.getElementById('route-name').value=file.name.replace(/\.(gpx|kml)$/i,'').replace(/_/g,' ')}
+    else toast('No track data found');
+  };reader.readAsText(file);
 }
-
-function handlePinPhoto(input) {
-  const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    pendingPinPhoto = e.target.result;
-    const p = document.getElementById('pin-photo-preview');
-    p.src = e.target.result; p.style.display = 'block';
-  };
+function handlePinPhoto(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{pendingPinPhoto=e.target.result;const p=document.getElementById('pin-photo-preview');p.src=e.target.result;p.style.display='block'};
   reader.readAsDataURL(file);
 }
 
-// ══════════════════════════════════════
-// SAVE
-// ══════════════════════════════════════
-function savePin() {
-  if (!pendingPinLatLng) { closeSheet('sheet-pin'); return; }
-  const d = getData();
-  const pin = {
-    id: Date.now().toString(), city: d.activeCity,
-    lat: pendingPinLatLng.lat, lng: pendingPinLatLng.lng,
-    emoji: selectedEmoji, note: document.getElementById('pin-note').value.trim(),
-    photo: pendingPinPhoto, time: new Date().toISOString(),
-  };
-  d.pins.push(pin); saveData(d);
-  drawPin(pin);
-  closeSheet('sheet-pin'); resetPinForm();
-  toast(t('pinSaved') + ' ' + selectedEmoji);
-  checkAchievements(true);
-}
-
-function saveRoute() {
-  const name = document.getElementById('route-name').value.trim();
-  if (!name) { toast(t('enterRouteName')); return; }
-  const d = getData();
-  const route = {
-    id: Date.now().toString(), city: d.activeCity, name,
-    story: document.getElementById('route-story').value.trim(),
-    mood: selectedMood, color: selectedRouteColor,
-    coords: pendingGPXData || [], date: new Date().toISOString(),
-  };
-  if (pendingGPXData && pendingGPXData.length > 0) route.km = calcDistance(pendingGPXData);
-  d.routes.push(route); saveData(d);
-  drawRoute(route);
-  if (route.coords.length > 0) map.fitBounds(L.polyline(route.coords).getBounds(), { padding: [40,40] });
-  closeSheet('sheet-import'); resetImportForm();
-  toast(t('routeSaved'));
-  checkAchievements(true);
-}
-
-function calcDistance(coords) {
-  let total = 0;
-  for (let i = 1; i < coords.length; i++) total += L.latLng(coords[i-1]).distanceTo(L.latLng(coords[i]));
-  return (total / 1000).toFixed(1);
-}
-
-// ══════════════════════════════════════
-// CITIES
-// ══════════════════════════════════════
-function openCityManager() {
-  renderCityList();
-  document.getElementById('sheet-city-title').textContent = t('cityTitle');
-  openSheet('sheet-city');
-}
-
-function renderCityList() {
-  const d = getData();
-  const el = document.getElementById('city-list');
-  if (d.cities.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🏙</div><div class="empty-text">${t('emptyCity')}</div></div>`;
-    return;
+// ── SAVE ──
+async function savePin(){
+  const d=getData();const note=document.getElementById('pin-note').value.trim();
+  if(editingPinId){
+    const pin=d.pins.find(p=>p.id===editingPinId);if(!pin){closeSheet('sheet-pin');return}
+    pin.emoji=selectedEmoji;pin.note=note;
+    if(pendingPinPhoto){await savePhoto(pin.id,pendingPinPhoto);pin.hasPhoto=true}
+    saveData(d);clearMapLayers();loadMapData();closeSheet('sheet-pin');resetPinForm();toast(t('pinUpdated'));
+  }else{
+    if(!pendingPinLatLng){closeSheet('sheet-pin');return}
+    const pin={id:Date.now().toString(),city:d.activeCity,lat:pendingPinLatLng.lat,lng:pendingPinLatLng.lng,emoji:selectedEmoji,note,hasPhoto:!!pendingPinPhoto,time:new Date().toISOString()};
+    if(pendingPinPhoto)await savePhoto(pin.id,pendingPinPhoto);
+    d.pins.push(pin);saveData(d);drawPin(pin);closeSheet('sheet-pin');resetPinForm();toast(t('pinSaved')+' '+selectedEmoji);
   }
-  el.innerHTML = d.cities.map(c => {
-    const count = d.routes.filter(r=>r.city===c).length;
-    const isActive = d.activeCity === c;
-    return `<div class="city-item" onclick="selectCity('${c}')">
-      ${isActive ? '<div class="city-active-dot"></div>' : '<div style="width:8px"></div>'}
-      <div class="city-item-name">${c}</div>
-      <div class="city-item-count">${count} routes</div>
-    </div>`;
+  checkAchievements(true);
+}
+
+function saveRoute(){
+  const name=document.getElementById('route-name').value.trim();if(!name){toast(t('enterRouteName'));return}
+  const d=getData();
+  if(editingRouteId){
+    const route=d.routes.find(r=>r.id===editingRouteId);if(!route){closeSheet('sheet-import');return}
+    route.name=name;route.story=document.getElementById('route-story').value.trim();
+    route.mood=selectedMood;route.weather=selectedWeather;route.tags=selectedTags.slice();route.color=selectedRouteColor;
+    if(pendingGPXData&&pendingGPXData.length>0){route.coords=pendingGPXData;route.km=calcDist(pendingGPXData)}
+    saveData(d);clearMapLayers();loadMapData();closeSheet('sheet-import');resetImportForm();toast(t('routeUpdated'));
+  }else{
+    const route={id:Date.now().toString(),city:d.activeCity,name,story:document.getElementById('route-story').value.trim(),
+      mood:selectedMood,weather:selectedWeather,tags:selectedTags.slice(),color:selectedRouteColor,
+      coords:pendingGPXData||[],date:new Date().toISOString()};
+    if(pendingGPXData&&pendingGPXData.length>0)route.km=calcDist(pendingGPXData);
+    d.routes.push(route);saveData(d);drawRoute(route);
+    if(route.coords.length>0)map.fitBounds(L.polyline(route.coords).getBounds(),{padding:[40,40]});
+    closeSheet('sheet-import');resetImportForm();toast(t('routeSaved'));
+  }
+  checkAchievements(true);
+}
+function calcDist(c){let t=0;for(let i=1;i<c.length;i++)t+=L.latLng(c[i-1]).distanceTo(L.latLng(c[i]));return(t/1000).toFixed(1)}
+
+// ── CITIES ──
+function openCityManager(){renderCityList();openSheet('sheet-city')}
+function renderCityList(){
+  const d=getData(),el=document.getElementById('city-list');
+  if(!d.cities.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🏙</div><div class="empty-text">'+t('emptyCity')+'</div></div>';return}
+  el.innerHTML=d.cities.map(c=>{
+    const cnt=d.routes.filter(r=>r.city===c).length,isA=d.activeCity===c;
+    return '<div class="city-item"><div onclick="selectCity(\''+c+'\')" style="display:flex;align-items:center;gap:12px;flex:1">'+(isA?'<div class="city-active-dot"></div>':'<div style="width:8px"></div>')+'<div class="city-item-name">'+c+'</div><div class="city-item-count">'+cnt+' routes</div></div><button class="city-delete" onclick="event.stopPropagation();deleteCity(\''+c+'\')">✕</button></div>';
+  }).join('');
+}
+function selectCity(name){
+  const d=getData();d.activeCity=name;saveData(d);
+  document.getElementById('city-name-display').textContent=name;
+  clearMapLayers();loadMapData();
+  geocodeCity(name);
+  renderCityList();closeSheet('sheet-city');toast(t('switchedTo')+' '+name);checkAchievements(true);
+}
+function addCity(){
+  const name=document.getElementById('new-city-input').value.trim();if(!name)return;
+  const d=getData();if(d.cities.includes(name)){toast(t('cityExists'));return}
+  d.cities.push(name);if(!d.activeCity)d.activeCity=name;saveData(d);
+  document.getElementById('new-city-input').value='';
+  document.getElementById('city-name-display').textContent=d.activeCity;
+  if(d.activeCity===name)geocodeCity(name);
+  renderCityList();toast(t('cityAdded')+' '+name);checkAchievements(true);
+}
+function deleteCity(name){
+  if(!confirm(t('confirmDeleteCity')))return;
+  const d=getData();
+  d.pins.filter(p=>p.city===name).forEach(p=>{if(p.hasPhoto)deletePhoto(p.id)});
+  d.pins=d.pins.filter(p=>p.city!==name);d.routes=d.routes.filter(r=>r.city!==name);
+  d.cities=d.cities.filter(c=>c!==name);
+  if(d.activeCity===name)d.activeCity=d.cities[0]||null;
+  saveData(d);document.getElementById('city-name-display').textContent=d.activeCity||t('selectCity');
+  clearMapLayers();loadMapData();renderCityList();toast(t('cityDeleted'));
+}
+function geocodeCity(name){
+  fetch('https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(name)+'&limit=1')
+    .then(r=>r.json()).then(data=>{if(data.length)map.setView([parseFloat(data[0].lat),parseFloat(data[0].lon)],13)}).catch(()=>{});
+}
+
+// ── DIARY ──
+function renderDiary(){
+  const d=getData(),el=document.getElementById('diary-list');
+  const q=(document.getElementById('search-diary').value||'').toLowerCase();
+  let routes=d.routes.filter(r=>r.city===d.activeCity).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(q)routes=routes.filter(r=>(r.name+' '+r.story).toLowerCase().includes(q));
+  if(!routes.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📖</div><div class="empty-text">'+t('emptyDiary').replace('\\n','<br/>')+'</div></div>';return}
+  el.innerHTML=routes.map(r=>{
+    const date=new Date(r.date);
+    const ds=currentLang==='zh'?date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日':date.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+    const tagHtml=(r.tags||[]).map(tg=>'<span class="diary-tag">'+tg+'</span>').join('');
+    return '<div class="diary-card" onclick="openRouteDetail(\''+r.id+'\')"><div class="diary-date">'+ds+(r.weather?' '+r.weather:'')+'</div><div class="diary-title">'+(r.mood||'')+' '+r.name+'</div><div class="diary-meta">'+(r.km?'<span>🚶 '+r.km+' km</span>':'')+'<span style="color:'+(r.color||'var(--gold)')+'">●</span></div>'+(tagHtml?'<div class="diary-tags">'+tagHtml+'</div>':'')+(r.story?'<div class="diary-story">'+r.story+'</div>':'')+'</div>';
   }).join('');
 }
 
-function selectCity(name) {
-  const d = getData(); d.activeCity = name; saveData(d);
-  document.getElementById('city-name-display').textContent = name;
-  clearMapLayers(); loadMapData();
-  renderCityList(); closeSheet('sheet-city');
-  toast(t('switchedTo') + ' ' + name);
-  checkAchievements(true);
-}
-
-function addCity() {
-  const name = document.getElementById('new-city-input').value.trim(); if (!name) return;
-  const d = getData();
-  if (d.cities.includes(name)) { toast(t('cityExists')); return; }
-  d.cities.push(name);
-  if (!d.activeCity) d.activeCity = name;
-  saveData(d);
-  document.getElementById('new-city-input').value = '';
-  document.getElementById('city-name-display').textContent = d.activeCity;
-  renderCityList(); toast(t('cityAdded') + ' ' + name);
-  checkAchievements(true);
-}
-
-// ══════════════════════════════════════
-// DIARY
-// ══════════════════════════════════════
-function renderDiary() {
-  const d = getData();
-  const el = document.getElementById('diary-list');
-  const routes = d.routes.filter(r=>r.city===d.activeCity).sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if (routes.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📖</div><div class="empty-text">${t('emptyDiary').replace('\\n','<br/>')}</div></div>`;
-    return;
-  }
-  el.innerHTML = routes.map(r => {
-    const date = new Date(r.date);
-    const dateStr = currentLang === 'zh'
-      ? `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`
-      : date.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-    return `<div class="diary-card" onclick="openRouteDetail('${r.id}')">
-      <div class="diary-date">${dateStr}</div>
-      <div class="diary-title">${r.mood||''} ${r.name}</div>
-      <div class="diary-meta">
-        ${r.km ? `<span>🚶 ${r.km} km</span>` : ''}
-        <span style="color:${r.color||'var(--gold)'}">●</span>
-      </div>
-      ${r.story ? `<div class="diary-story">${r.story}</div>` : ''}
-    </div>`;
+// ── ROUTES ──
+function renderRoutes(){
+  const d=getData(),el=document.getElementById('routes-list');
+  const q=(document.getElementById('search-routes').value||'').toLowerCase();
+  let routes=d.routes.filter(r=>r.city===d.activeCity);
+  if(q)routes=routes.filter(r=>(r.name+' '+r.story).toLowerCase().includes(q));
+  if(!routes.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🗺</div><div class="empty-text">'+t('emptyRoutes').replace('\\n','<br/>')+'</div></div>';return}
+  el.innerHTML=routes.map(r=>{
+    const ds=(new Date(r.date).getMonth()+1)+'/'+(new Date(r.date).getDate());
+    return '<div class="diary-card" onclick="openRouteDetail(\''+r.id+'\')"><div class="diary-date">'+ds+' · '+(r.coords?.length||0)+' '+t('trackPoints')+'</div><div class="diary-title" style="color:'+(r.color||'var(--gold)')+'">'+r.name+'</div><div class="diary-meta">'+(r.km?'<span>🚶 '+r.km+' km</span>':'')+(r.mood?'<span>'+r.mood+'</span>':'')+(r.weather?'<span>'+r.weather+'</span>':'')+'</div></div>';
   }).join('');
 }
 
-// ══════════════════════════════════════
-// ROUTES LIST
-// ══════════════════════════════════════
-function renderRoutes() {
-  const d = getData();
-  const el = document.getElementById('routes-list');
-  const routes = d.routes.filter(r=>r.city===d.activeCity);
-  if (routes.length === 0) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🗺</div><div class="empty-text">${t('emptyRoutes').replace('\\n','<br/>')}</div></div>`;
-    return;
-  }
-  el.innerHTML = routes.map(r => {
-    const date = new Date(r.date);
-    const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
-    return `<div class="diary-card" onclick="openRouteDetail('${r.id}')">
-      <div class="diary-date">${dateStr} · ${r.coords?.length||0} ${t('trackPoints')}</div>
-      <div class="diary-title" style="color:${r.color||'var(--gold)'}">${r.name}</div>
-      <div class="diary-meta">
-        ${r.km ? `<span>🚶 ${r.km} km</span>` : ''}
-        ${r.mood ? `<span>${r.mood}</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════
-// ROUTE DETAIL
-// ══════════════════════════════════════
-function openRouteDetail(id) {
-  const d = getData();
-  const route = d.routes.find(r=>r.id===id); if (!route) return;
-  document.getElementById('route-detail-title').textContent = route.name;
-  const date = new Date(route.date);
-  const dateStr = currentLang === 'zh'
-    ? `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`
-    : date.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
-  const cityPins = d.pins.filter(p=>p.city===route.city);
-  document.getElementById('route-detail-body').innerHTML = `
-    <div class="route-detail-header">
-      <div class="route-detail-title">${route.mood||''} ${route.name}</div>
-      <div class="route-detail-meta">
-        <span>${dateStr}</span>
-        ${route.km ? `<span>🚶 ${route.km} km</span>` : ''}
-        <span>${route.coords?.length||0} ${t('trackPoints')}</span>
-      </div>
-    </div>
-    ${route.story ? `<div style="padding:16px 20px;font-size:14px;line-height:1.8;color:var(--text-dim);border-bottom:1px solid var(--border)">${route.story}</div>` : ''}
-    <div style="padding:16px 20px">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px">${currentLang==='zh'?'标记点':'Pins'}</div>
-      ${cityPins.length === 0
-        ? `<div style="color:var(--text-dim);font-size:14px">${t('noPins')}</div>`
-        : cityPins.map(p=>`
-          <div class="pin-list-item">
-            <div class="pin-icon">${p.emoji||'📍'}</div>
-            <div class="pin-info">
-              ${p.note ? `<div class="pin-note">${p.note}</div>` : `<div class="pin-note" style="color:var(--text-dim)">${t('noNote')}</div>`}
-              <div class="pin-time">${new Date(p.time).toLocaleDateString()}</div>
-            </div>
-            ${p.photo ? `<img class="pin-photo" src="${p.photo}"/>` : ''}
-          </div>`).join('')
-      }
-    </div>
-    <div style="padding:0 20px 20px">
-      <button class="btn-secondary" onclick="flyToRoute('${route.id}')">${t('viewOnMap')}</button>
-      <button class="btn-danger" onclick="deleteRoute('${route.id}')">${t('deleteRoute')}</button>
-    </div>`;
+// ── ROUTE DETAIL ──
+function openRouteDetail(id){
+  const d=getData(),route=d.routes.find(r=>r.id===id);if(!route)return;
+  document.getElementById('route-detail-title').textContent=route.name;
+  const date=new Date(route.date);
+  const ds=currentLang==='zh'?date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日':date.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  const nearPins=d.pins.filter(p=>p.city===route.city&&isNearRoute(p,route));
+  let pinHtml=nearPins.length===0?'<div style="color:var(--text-dim);font-size:14px">'+t('noPins')+'</div>':nearPins.map(p=>'<div class="pin-list-item"><div class="pin-icon">'+(p.emoji||'📍')+'</div><div class="pin-info">'+(p.note?'<div class="pin-note">'+p.note+'</div>':'<div class="pin-note" style="color:var(--text-dim)">'+t('noNote')+'</div>')+'<div class="pin-time">'+new Date(p.time).toLocaleDateString()+'</div></div>'+(p.hasPhoto?'<img class="pin-photo" data-pin-id="'+p.id+'" onclick="viewPinPhoto(\''+p.id+'\')"/>':'')+'</div>').join('');
+  const tagHtml=(route.tags||[]).map(tg=>'<span class="diary-tag">'+tg+'</span>').join('');
+  document.getElementById('route-detail-body').innerHTML=
+    '<div class="route-detail-header"><div class="route-detail-title">'+(route.mood||'')+' '+route.name+'</div><div class="route-detail-meta"><span>'+ds+'</span>'+(route.km?'<span>🚶 '+route.km+' km</span>':'')+(route.weather?'<span>'+route.weather+'</span>':'')+'<span>'+(route.coords?.length||0)+' '+t('trackPoints')+'</span></div>'+(tagHtml?'<div class="diary-tags" style="margin-top:8px">'+tagHtml+'</div>':'')+'</div>'+
+    (route.story?'<div style="padding:16px 20px;font-size:14px;line-height:1.8;color:var(--text-dim);border-bottom:1px solid var(--border)">'+route.story+'</div>':'')+
+    '<div style="padding:16px 20px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:12px">'+(currentLang==='zh'?'标记点':'Pins')+'</div>'+pinHtml+'</div>'+
+    '<div style="padding:0 20px 20px"><button class="btn-secondary" onclick="editRoute(\''+route.id+'\')">✏️ '+t('editBtn')+'</button><button class="btn-secondary" onclick="flyToRoute(\''+route.id+'\')">'+t('viewOnMap')+'</button>'+(route.coords.length>1?'<button class="btn-secondary" onclick="startReplay(\''+route.id+'\')">▶ '+t('replay')+'</button>':'')+'<button class="btn-secondary" onclick="openPostcard(\''+route.id+'\')">🏞 '+t('postcard')+'</button><button class="btn-danger" onclick="deleteRoute(\''+route.id+'\')">'+t('deleteRoute')+'</button></div>';
   document.getElementById('panel-route-detail').classList.add('open');
+  nearPins.filter(p=>p.hasPhoto).forEach(p=>{getPhoto(p.id).then(data=>{const img=document.querySelector('[data-pin-id="'+p.id+'"]');if(img&&data)img.src=data})});
 }
-
-function closeRouteDetail() { document.getElementById('panel-route-detail').classList.remove('open'); }
-
-function flyToRoute(id) {
-  const route = getData().routes.find(r=>r.id===id);
-  if (route && route.coords.length > 0) {
-    closeRouteDetail(); switchTab('map');
-    map.fitBounds(L.polyline(route.coords).getBounds(), { padding:[40,40] });
-  }
+function isNearRoute(pin,route){
+  if(!route.coords||!route.coords.length)return true;
+  const pll=L.latLng(pin.lat,pin.lng);
+  for(let i=0;i<route.coords.length;i+=Math.max(1,Math.floor(route.coords.length/50))){
+    if(pll.distanceTo(L.latLng(route.coords[i]))<500)return true;
+  }return false;
 }
-
-function deleteRoute(id) {
-  if (!confirm(t('confirmDelete'))) return;
-  const d = getData(); d.routes = d.routes.filter(r=>r.id!==id); saveData(d);
-  closeRouteDetail(); clearMapLayers(); loadMapData();
-  renderRoutes(); renderDiary();
-  toast(t('routeDeleted'));
-}
-
-// ══════════════════════════════════════
-// PIN DETAIL
-// ══════════════════════════════════════
-function openPinDetail(id) {
-  const pin = getData().pins.find(p=>p.id===id); if (!pin) return;
-  document.getElementById('pin-detail-title').textContent = pin.emoji + ' ' + (currentLang==='zh'?'标记':'Pin');
-  document.getElementById('pin-detail-body').innerHTML = `
-    <div style="font-size:15px;line-height:1.7;margin-bottom:16px">${pin.note || `<span style="color:var(--text-dim)">${t('noNote')}</span>`}</div>
-    ${pin.photo ? `<img src="${pin.photo}" style="width:100%;border-radius:12px;margin-bottom:16px"/>` : ''}
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:20px">${new Date(pin.time).toLocaleString()}</div>
-    <button class="btn-danger" onclick="deletePin('${pin.id}')">${t('deletePin')}</button>
-    <button class="btn-secondary" onclick="closeSheet('sheet-pin-detail')">${t('close')}</button>`;
-  openSheet('sheet-pin-detail');
-}
-
-function deletePin(id) {
-  const d = getData(); d.pins = d.pins.filter(p=>p.id!==id); saveData(d);
-  closeSheet('sheet-pin-detail');
-  map.eachLayer(l=>{ if (l instanceof L.Marker) map.removeLayer(l); });
-  d.pins.filter(p=>p.city===d.activeCity).forEach(drawPin);
-  toast(t('pinDeleted'));
-}
-
-// ══════════════════════════════════════
-// ACHIEVEMENTS
-// ══════════════════════════════════════
-function checkAchievements(animate) {
-  const d = getData();
-  if (!d.unlockedAch) d.unlockedAch = [];
-  let newUnlocks = [];
-  ACHIEVEMENTS.forEach(a => {
-    if (!d.unlockedAch.includes(a.id) && a.check(d)) {
-      d.unlockedAch.push(a.id);
-      if (!d.achDates) d.achDates = {};
-      d.achDates[a.id] = new Date().toISOString();
-      newUnlocks.push(a);
-    }
-  });
-  if (newUnlocks.length > 0) saveData(d);
-  if (animate && newUnlocks.length > 0) showAchievementPopup(newUnlocks[0]);
-}
-
-function showAchievementPopup(a) {
-  const name = currentLang === 'zh' ? a.name_zh : a.name_en;
-  const desc = currentLang === 'zh' ? a.desc_zh : a.desc_en;
-  document.getElementById('ach-popup-icon').textContent = a.icon;
-  document.getElementById('ach-popup-label').textContent = t('achUnlocked');
-  document.getElementById('ach-popup-name').textContent = name;
-  document.getElementById('ach-popup-desc').textContent = desc;
-  const popup = document.getElementById('ach-popup');
-  popup.classList.add('show');
-  setTimeout(() => popup.classList.remove('show'), 3500);
-}
-
-function renderAchievements() {
-  const d = getData();
-  const unl = d.unlockedAch || [];
-  const achDates = d.achDates || {};
-
-  // stats
-  const km = totalKm(d).toFixed(1);
-  const routeCount = d.routes.length;
-  const pinCount = d.pins.length;
-  const cityCount = d.cities.length;
-  document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card"><div class="stat-value">${km}</div><div class="stat-label">${t('totalKm')}</div></div>
-    <div class="stat-card"><div class="stat-value">${routeCount}</div><div class="stat-label">${t('totalRoutes')}</div></div>
-    <div class="stat-card"><div class="stat-value">${pinCount}</div><div class="stat-label">${t('totalPins')}</div></div>
-    <div class="stat-card"><div class="stat-value">${cityCount}</div><div class="stat-label">${t('totalCities')}</div></div>`;
-
-  document.getElementById('achievement-grid').innerHTML = ACHIEVEMENTS.map(a => {
-    const isUnlocked = unl.includes(a.id);
-    const name = currentLang === 'zh' ? a.name_zh : a.name_en;
-    const desc = currentLang === 'zh' ? a.desc_zh : a.desc_en;
-    const dateStr = achDates[a.id] ? new Date(achDates[a.id]).toLocaleDateString() : '';
-    return `<div class="ach-card ${isUnlocked?'unlocked':'locked'}">
-      <div class="ach-icon">${isUnlocked ? a.icon : '🔒'}</div>
-      <div class="ach-name">${name}</div>
-      <div class="ach-desc">${desc}</div>
-      ${isUnlocked && dateStr ? `<div class="ach-date">${dateStr}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════
-// THEME & LANG
-// ══════════════════════════════════════
-function setTheme(theme) {
-  currentTheme = theme;
-  applyTheme(theme, true);
-  const p = getPrefs(); p.theme = theme; savePrefs(p);
-}
-
-function applyTheme(theme, save) {
-  document.body.setAttribute('data-theme', theme === 'default' ? '' : theme);
-  ['default','classic','journal'].forEach(t => {
-    document.getElementById('swatch-'+t)?.classList.toggle('selected', t === theme);
-  });
-}
-
-function setLang(lang) {
-  currentLang = lang;
-  applyLang(lang);
-  const p = getPrefs(); p.lang = lang; savePrefs(p);
-}
-
-function applyLang(lang) {
-  currentLang = lang;
-  const L = T[lang];
-  document.getElementById('lang-zh').classList.toggle('active', lang==='zh');
-  document.getElementById('lang-en').classList.toggle('active', lang==='en');
-  document.getElementById('nav-map').textContent           = L.map;
-  document.getElementById('nav-diary').textContent         = L.diary;
-  document.getElementById('nav-routes').textContent        = L.routes;
-  document.getElementById('nav-achievements').textContent  = L.achievements;
-  document.getElementById('city-name-display').textContent = getData().activeCity || L.selectCity;
-  document.getElementById('title-diary').textContent       = L.diary;
-  document.getElementById('title-routes').textContent      = L.routes;
-  document.getElementById('title-achievements').textContent= L.achievements;
-  document.getElementById('sheet-pin-title').textContent   = L.newPin;
-  document.getElementById('sheet-import-title').textContent= L.importRoute;
-  document.getElementById('sheet-city-title').textContent  = L.cityTitle;
-  document.getElementById('sheet-settings-title').textContent = L.settings;
-  document.getElementById('lbl-icon').textContent          = L.icon;
-  document.getElementById('lbl-note').textContent          = L.note;
-  document.getElementById('lbl-photo').textContent         = L.photo;
-  document.getElementById('pin-note').placeholder          = L.notePlaceholder;
-  document.getElementById('btn-choose-photo').textContent  = L.choosePhoto;
-  document.getElementById('btn-save-pin').textContent      = L.savePin;
-  document.getElementById('btn-cancel-pin').textContent    = L.cancel;
-  document.getElementById('lbl-route-name').textContent    = L.routeName;
-  document.getElementById('lbl-story').textContent         = L.story;
-  document.getElementById('lbl-mood').textContent          = L.mood;
-  document.getElementById('lbl-color').textContent         = L.color;
-  document.getElementById('route-name').placeholder        = L.routeNamePlaceholder;
-  document.getElementById('route-story').placeholder       = L.storyPlaceholder;
-  document.getElementById('import-hint').innerHTML         = L.importHint + "<br/><small>" + L.importSub + "</small>";
-  document.getElementById('btn-save-route').textContent    = L.saveRoute;
-  document.getElementById('btn-cancel-route').textContent  = L.cancel;
-  document.getElementById('lbl-new-city').textContent      = L.addCity;
-  document.getElementById('new-city-input').placeholder    = L.cityPlaceholder;
-  document.getElementById('btn-add-city').textContent      = L.add;
-  document.getElementById('btn-done-city').textContent     = L.done;
-  document.getElementById('lbl-lang').textContent          = L.lang;
-  document.getElementById('lbl-theme').textContent         = L.theme;
-  document.getElementById('lbl-backup').textContent        = L.backup;
-  document.getElementById('btn-export').textContent        = L.exportBackup;
-  document.getElementById('restore-hint').textContent      = L.restoreHint;
-  document.getElementById('btn-close-settings').textContent= L.closeSettings;
-  document.getElementById('theme-name-default').textContent= L.themeDefault;
-  document.getElementById('theme-name-classic').textContent= L.themeClassic;
-  document.getElementById('theme-name-journal').textContent= L.themeJournal;
-  document.getElementById('ach-popup-label').textContent   = L.achUnlocked;
-}
-
-// ══════════════════════════════════════
-// BACKUP
-// ══════════════════════════════════════
-function exportBackup() {
-  const d = getData();
-  const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `withme-backup-${new Date().toISOString().slice(0,10)}.json`;
-  a.click(); URL.revokeObjectURL(url);
-  toast(t('backupExported'));
-}
-
-function importBackup(input) {
-  const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!data.routes || !data.pins) throw new Error();
-      localStorage.setItem('withme_data', JSON.stringify(data));
-      toast(t('backupRestored'));
-    } catch { toast(t('backupInvalid')); }
-  };
-  reader.readAsText(file);
-}
-
-// ══════════════════════════════════════
-// TABS
-// ══════════════════════════════════════
-function switchTab(tab) {
-  ['map','diary','routes','achievements'].forEach(id => {
-    document.getElementById('nav-'+id).classList.toggle('active', id===tab);
-    if (id !== 'map') document.getElementById('panel-'+id).classList.toggle('open', id===tab);
-  });
-  // hide/show topbar and fab on non-map tabs
-  const isMap = tab === 'map';
-  document.getElementById('topbar').classList.toggle('hidden', !isMap);
-  document.getElementById('fab').classList.toggle('hidden', !isMap);
-  if (tab === 'diary') renderDiary();
-  if (tab === 'routes') renderRoutes();
-  if (tab === 'achievements') renderAchievements();
-}
-
-// ══════════════════════════════════════
-// SHEETS
-// ══════════════════════════════════════
-function openSheet(id) { document.getElementById(id).classList.add('open'); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
-function openImportSheet() {
-  if (!getData().activeCity) { toast(t('selectCityFirst')); return; }
+function closeRouteDetail(){document.getElementById('panel-route-detail').classList.remove('open')}
+function flyToRoute(id){const r=getData().routes.find(x=>x.id===id);if(r&&r.coords.length>0){closeRouteDetail();switchTab('map');map.fitBounds(L.polyline(r.coords).getBounds(),{padding:[40,40]})}}
+function deleteRoute(id){if(!confirm(t('confirmDelete')))return;const d=getData();d.routes=d.routes.filter(r=>r.id!==id);saveData(d);closeRouteDetail();clearMapLayers();loadMapData();toast(t('routeDeleted'))}
+function editRoute(id){
+  const d=getData(),r=d.routes.find(x=>x.id===id);if(!r)return;
+  editingRouteId=id;closeRouteDetail();
+  document.getElementById('sheet-import-title').textContent=t('editRoute');
+  document.getElementById('btn-save-route').textContent=t('updateRoute');
+  document.getElementById('gpx-import-area').style.display=r.coords.length?'none':'block';
+  document.getElementById('route-name').value=r.name;document.getElementById('route-story').value=r.story||'';
+  selectedMood=r.mood||'😊';selectedWeather=r.weather||'';selectedTags=r.tags?r.tags.slice():[];selectedRouteColor=r.color||'#C9A96E';
+  buildMoodGrid();buildWeatherGrid();buildTagGrid();buildColorRow();
   openSheet('sheet-import');
 }
-function openSettingsSheet() { openSheet('sheet-settings'); }
 
-document.querySelectorAll('.sheet-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
-});
+// ── PIN DETAIL ──
+async function openPinDetail(id){
+  const pin=getData().pins.find(p=>p.id===id);if(!pin)return;
+  let photoHtml='';if(pin.hasPhoto){const data=await getPhoto(id);if(data)photoHtml='<img src="'+data+'" style="width:100%;border-radius:12px;margin-bottom:16px"/>';}
+  document.getElementById('pin-detail-title').textContent=pin.emoji+' '+(currentLang==='zh'?'标记':'Pin');
+  document.getElementById('pin-detail-body').innerHTML=
+    '<div style="font-size:15px;line-height:1.7;margin-bottom:16px">'+(pin.note||'<span style="color:var(--text-dim)">'+t('noNote')+'</span>')+'</div>'+
+    photoHtml+
+    '<div style="font-size:12px;color:var(--text-dim);margin-bottom:20px">'+new Date(pin.time).toLocaleString()+'</div>'+
+    '<button class="btn-secondary" onclick="editPin(\''+pin.id+'\')">✏️ '+t('editBtn')+'</button>'+
+    '<button class="btn-danger" onclick="deletePin(\''+pin.id+'\')">'+t('deletePin')+'</button>'+
+    '<button class="btn-secondary" onclick="closeSheet(\'sheet-pin-detail\')">'+t('close')+'</button>';
+  openSheet('sheet-pin-detail');
+}
+async function editPin(id){
+  const d=getData(),pin=d.pins.find(p=>p.id===id);if(!pin)return;
+  editingPinId=id;closeSheet('sheet-pin-detail');
+  document.getElementById('sheet-pin-title').textContent=t('editPin');
+  document.getElementById('btn-save-pin').textContent=t('savePin');
+  document.getElementById('pin-note').value=pin.note||'';
+  selectedEmoji=pin.emoji||'📍';buildEmojiGrid();
+  if(pin.hasPhoto){const data=await getPhoto(id);if(data){const p=document.getElementById('pin-photo-preview');p.src=data;p.style.display='block'}}
+  openSheet('sheet-pin');
+}
+function deletePin(id){const d=getData();const pin=d.pins.find(p=>p.id===id);if(pin&&pin.hasPhoto)deletePhoto(id);d.pins=d.pins.filter(p=>p.id!==id);saveData(d);closeSheet('sheet-pin-detail');clearMapLayers();loadMapData();toast(t('pinDeleted'))}
+async function viewPinPhoto(id){const data=await getPhoto(id);if(data){document.getElementById('photo-view-img').src=data;openSheet('sheet-photo-view')}}
 
-// ══════════════════════════════════════
-// BUILDERS
-// ══════════════════════════════════════
-function buildEmojiGrid() {
-  document.getElementById('pin-emoji-grid').innerHTML = PIN_EMOJIS.map(e =>
-    `<div class="emoji-btn${e==='📍'?' selected':''}" onclick="selectEmoji(this,'${e}')">${e}</div>`
-  ).join('');
-}
-function selectEmoji(el, emoji) {
-  document.querySelectorAll('.emoji-btn').forEach(b=>b.classList.remove('selected'));
-  el.classList.add('selected'); selectedEmoji = emoji;
-}
-
-function buildMoodGrid() {
-  document.getElementById('route-mood-grid').innerHTML = MOODS.map((m,i) =>
-    `<div class="mood-btn${i===0?' selected':''}" onclick="selectMood(this,'${m}')">${m}</div>`
-  ).join('');
-}
-function selectMood(el, mood) {
-  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('selected'));
-  el.classList.add('selected'); selectedMood = mood;
-}
-
-function buildColorRow() {
-  document.getElementById('route-color-row').innerHTML = ROUTE_COLORS.map((c,i) =>
-    `<div class="color-dot${i===0?' selected':''}" style="background:${c}" onclick="selectColor(this,'${c}')"></div>`
-  ).join('');
-}
-function selectColor(el, color) {
-  document.querySelectorAll('.color-dot').forEach(b=>b.classList.remove('selected'));
-  el.classList.add('selected'); selectedRouteColor = color;
+// ── PHOTOS PANEL ──
+async function renderPhotos(){
+  const d=getData(),body=document.getElementById('photos-body');
+  const pinsWithPhotos=d.pins.filter(p=>p.hasPhoto&&p.city===d.activeCity);
+  if(!pinsWithPhotos.length){body.innerHTML='<div class="empty-state"><div class="empty-icon">📷</div><div class="empty-text">'+t('emptyPhotos')+'</div></div>';return}
+  body.innerHTML='<div class="photo-grid">'+pinsWithPhotos.map(p=>'<img class="photo-grid-item" data-photo-id="'+p.id+'" onclick="viewPinPhoto(\''+p.id+'\')"/>').join('')+'</div>';
+  for(const p of pinsWithPhotos){const data=await getPhoto(p.id);const img=document.querySelector('[data-photo-id="'+p.id+'"]');if(img&&data)img.src=data}
 }
 
-function resetPinForm() {
-  document.getElementById('pin-note').value = '';
-  document.getElementById('pin-photo-preview').style.display = 'none';
-  pendingPinPhoto = null; pendingPinLatLng = null; selectedEmoji = '📍';
-  buildEmojiGrid();
-}
-function resetImportForm() {
-  document.getElementById('route-name').value = '';
-  document.getElementById('route-story').value = '';
-  document.getElementById('gpx-file-input').value = '';
-  pendingGPXData = null; selectedMood = '😊'; selectedRouteColor = '#C9A96E';
-  buildMoodGrid(); buildColorRow();
+// ── HEATMAP ──
+function toggleHeatmap(){
+  heatmapOn=!heatmapOn;document.getElementById('heatmap-btn').classList.toggle('active-heat',heatmapOn);
+  if(heatmapOn){
+    const d=getData();
+    d.routes.filter(r=>r.city===d.activeCity).forEach(r=>{
+      if(!r.coords)return;
+      for(let i=0;i<r.coords.length;i+=Math.max(1,Math.floor(r.coords.length/100))){
+        const c=L.circleMarker(r.coords[i],{radius:12,color:'transparent',fillColor:'#C9A96E',fillOpacity:.15,weight:0}).addTo(map);
+        heatCircles.push(c);
+      }
+    });
+    d.pins.filter(p=>p.city===d.activeCity).forEach(p=>{
+      const c=L.circleMarker([p.lat,p.lng],{radius:20,color:'transparent',fillColor:'#C97E7E',fillOpacity:.2,weight:0}).addTo(map);
+      heatCircles.push(c);
+    });
+    toast(t('heatmapOn'));
+  }else{heatCircles.forEach(c=>map.removeLayer(c));heatCircles=[];toast(t('heatmapOff'))}
 }
 
-// ══════════════════════════════════════
-// TOAST
-// ══════════════════════════════════════
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2200);
+// ── ROUTE REPLAY ──
+function startReplay(id){
+  const r=getData().routes.find(x=>x.id===id);if(!r||!r.coords.length)return;
+  closeRouteDetail();switchTab('map');
+  map.fitBounds(L.polyline(r.coords).getBounds(),{padding:[40,40]});
+  const bar=document.getElementById('replay-bar');bar.classList.add('show');
+  document.getElementById('replay-label').textContent=t('replayLabel');
+  let i=0;const total=r.coords.length;
+  const marker=L.circleMarker(r.coords[0],{radius:8,color:r.color||'#C9A96E',fillColor:r.color||'#C9A96E',fillOpacity:1,weight:2}).addTo(map);
+  replayTimer=setInterval(()=>{
+    if(i>=total){stopReplay();map.removeLayer(marker);return}
+    marker.setLatLng(r.coords[i]);
+    document.getElementById('replay-fill').style.width=(i/total*100)+'%';
+    i++;
+  },80);
 }
+function stopReplay(){if(replayTimer){clearInterval(replayTimer);replayTimer=null}document.getElementById('replay-bar').classList.remove('show')}
+
+// ── POSTCARD ──
+function openPostcard(id){
+  const d=getData(),r=d.routes.find(x=>x.id===id);if(!r)return;
+  closeRouteDetail();
+  const date=new Date(r.date);
+  const ds=currentLang==='zh'?date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日':date.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('pc-name').textContent=(r.mood||'')+' '+r.name;
+  document.getElementById('pc-date').textContent=ds+(r.weather?' '+r.weather:'');
+  document.getElementById('pc-story').textContent=(r.story||'').slice(0,120)+(r.story&&r.story.length>120?'…':'');
+  document.getElementById('pc-meta').innerHTML=(r.km?'<span>🚶 '+r.km+' km</span>':'')+'<span>'+(r.coords?.length||0)+' '+t('trackPoints')+'</span>';
+  const sig=getPrefs().signature;document.getElementById('pc-sig').textContent=sig?'— '+sig:'';
+  // draw route on canvas
+  const canvas=document.getElementById('postcard-canvas');const ctx=canvas.getContext('2d');
+  canvas.width=600;canvas.height=300;
+  ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--bg').trim()||'#0f1f18';ctx.fillRect(0,0,600,300);
+  if(r.coords.length>1){
+    const lats=r.coords.map(c=>c[0]),lons=r.coords.map(c=>c[1]);
+    const minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons);
+    const pad=30,w=600-pad*2,h=300-pad*2;
+    const scale=Math.min(w/(maxLon-minLon||1),h/(maxLat-minLat||1));
+    ctx.strokeStyle=r.color||'#C9A96E';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.globalAlpha=.8;ctx.beginPath();
+    r.coords.forEach((c,i)=>{
+      const x=pad+(c[1]-minLon)*scale;const y=pad+(maxLat-c[0])*scale;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });ctx.stroke();
+    ctx.globalAlpha=1;ctx.fillStyle=r.color||'#C9A96E';
+    const s=r.coords[0],e=r.coords[r.coords.length-1];
+    ctx.beginPath();ctx.arc(pad+(s[1]-minLon)*scale,pad+(maxLat-s[0])*scale,4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(pad+(e[1]-minLon)*scale,pad+(maxLat-e[0])*scale,6,0,Math.PI*2);ctx.fill();
+  }
+  document.getElementById('btn-save-postcard').textContent=t('saveImage');
+  openSheet('sheet-postcard');
+}
+function savePostcard(){
+  const el=document.getElementById('postcard-inner');
+  html2canvas(el,{backgroundColor:null,scale:2}).then(canvas=>{
+    const link=document.createElement('a');link.download='withme-postcard.png';link.href=canvas.toDataURL();link.click();
+    toast(currentLang==='zh'?'明信片已保存':'Postcard saved');
+  }).catch(()=>toast('Export failed'));
+}
+
+// ── ACHIEVEMENTS ──
+function checkAchievements(animate){
+  const d=getData();if(!d.unlockedAch)d.unlockedAch=[];if(!d.achDates)d.achDates={};
+  let news=[];ACHIEVEMENTS.forEach(a=>{if(!d.unlockedAch.includes(a.id)&&a.check(d)){d.unlockedAch.push(a.id);d.achDates[a.id]=new Date().toISOString();news.push(a)}});
+  if(news.length)saveData(d);if(animate&&news.length)showAchPopup(news[0]);
+}
+function showAchPopup(a){
+  document.getElementById('ach-popup-icon').textContent=a.icon;
+  document.getElementById('ach-popup-label').textContent=t('achUnlocked');
+  document.getElementById('ach-popup-name').textContent=currentLang==='zh'?a.name_zh:a.name_en;
+  document.getElementById('ach-popup-desc').textContent=currentLang==='zh'?a.desc_zh:a.desc_en;
+  document.getElementById('ach-popup').classList.add('show');
+  setTimeout(()=>document.getElementById('ach-popup').classList.remove('show'),3500);
+}
+function renderAchievements(){
+  const d=getData(),unl=d.unlockedAch||[],dates=d.achDates||{};
+  const km=tkm(d).toFixed(1);
+  document.getElementById('stats-grid').innerHTML=
+    '<div class="stat-card"><div class="stat-value">'+km+'</div><div class="stat-label">'+t('totalKm')+'</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+d.routes.length+'</div><div class="stat-label">'+t('totalRoutes')+'</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+d.pins.length+'</div><div class="stat-label">'+t('totalPins')+'</div></div>'+
+    '<div class="stat-card"><div class="stat-value">'+d.cities.length+'</div><div class="stat-label">'+t('totalCities')+'</div></div>';
+  document.getElementById('achievement-grid').innerHTML=ACHIEVEMENTS.map(a=>{
+    const u=unl.includes(a.id),n=currentLang==='zh'?a.name_zh:a.name_en,desc=currentLang==='zh'?a.desc_zh:a.desc_en;
+    return '<div class="ach-card '+(u?'unlocked':'locked')+'"><div class="ach-icon">'+(u?a.icon:'🔒')+'</div><div class="ach-name">'+n+'</div><div class="ach-desc">'+desc+'</div>'+(u&&dates[a.id]?'<div class="ach-date">'+new Date(dates[a.id]).toLocaleDateString()+'</div>':'')+'</div>';
+  }).join('');
+}
+
+// ── THEME & LANG ──
+function setTheme(theme){currentTheme=theme;applyTheme(theme);const p=getPrefs();p.theme=theme;savePrefs(p)}
+function applyTheme(theme){document.body.setAttribute('data-theme',theme==='default'?'':theme);['default','classic','journal'].forEach(t=>{document.getElementById('swatch-'+t)?.classList.toggle('selected',t===theme)})}
+function setLang(lang){currentLang=lang;applyLang(lang);const p=getPrefs();p.lang=lang;savePrefs(p)}
+function applyLang(lang){
+  currentLang=lang;const L=T[lang];
+  document.getElementById('lang-zh').classList.toggle('active',lang==='zh');
+  document.getElementById('lang-en').classList.toggle('active',lang==='en');
+  document.getElementById('nav-map').textContent=L.map;document.getElementById('nav-diary').textContent=L.diary;
+  document.getElementById('nav-routes').textContent=L.routes;document.getElementById('nav-photos').textContent=L.photos;
+  document.getElementById('nav-achievements').textContent=L.achievements;
+  document.getElementById('city-name-display').textContent=getData().activeCity||L.selectCity;
+  document.getElementById('title-diary').textContent=L.diary;document.getElementById('title-routes').textContent=L.routes;
+  document.getElementById('title-photos').textContent=L.photos;document.getElementById('title-achievements').textContent=L.achievements;
+  document.getElementById('sheet-pin-title').textContent=editingPinId?L.editPin:L.newPin;
+  document.getElementById('sheet-import-title').textContent=editingRouteId?L.editRoute:L.importRoute;
+  document.getElementById('sheet-city-title').textContent=L.cityTitle;document.getElementById('sheet-settings-title').textContent=L.settings;
+  document.getElementById('sheet-postcard-title').textContent=L.postcard;
+  document.getElementById('lbl-icon').textContent=L.icon;document.getElementById('lbl-note').textContent=L.note;document.getElementById('lbl-photo').textContent=L.photo;
+  document.getElementById('pin-note').placeholder=L.notePlaceholder;document.getElementById('btn-choose-photo').textContent=L.choosePhoto;
+  document.getElementById('btn-save-pin').textContent=L.savePin;document.getElementById('btn-cancel-pin').textContent=L.cancel;
+  document.getElementById('lbl-route-name').textContent=L.routeName;document.getElementById('lbl-story').textContent=L.story;
+  document.getElementById('lbl-mood').textContent=L.mood;document.getElementById('lbl-weather').textContent=L.weather;
+  document.getElementById('lbl-tags').textContent=L.tags;document.getElementById('lbl-color').textContent=L.color;
+  document.getElementById('route-name').placeholder=L.routeNamePlaceholder;document.getElementById('route-story').placeholder=L.storyPlaceholder;
+  document.getElementById('import-hint').innerHTML=L.importHint+'<br/><small>'+L.importSub+'</small>';
+  document.getElementById('btn-save-route').textContent=editingRouteId?L.updateRoute:L.saveRoute;document.getElementById('btn-cancel-route').textContent=L.cancel;
+  document.getElementById('lbl-new-city').textContent=L.addCity;document.getElementById('new-city-input').placeholder=L.cityPlaceholder;
+  document.getElementById('btn-add-city').textContent=L.add;document.getElementById('btn-done-city').textContent=L.done;
+  document.getElementById('lbl-lang').textContent=L.lang;document.getElementById('lbl-theme').textContent=L.theme;
+  document.getElementById('lbl-backup').textContent=L.backup;document.getElementById('lbl-signature').textContent=L.signature;
+  document.getElementById('signature-input').placeholder=L.sigPlaceholder;
+  document.getElementById('btn-export').textContent=L.exportBackup;document.getElementById('restore-hint').textContent=L.restoreHint;
+  document.getElementById('btn-close-settings').textContent=L.closeSettings;
+  document.getElementById('theme-name-default').textContent=L.themeDefault;document.getElementById('theme-name-classic').textContent=L.themeClassic;
+  document.getElementById('theme-name-journal').textContent=L.themeJournal;
+  document.getElementById('search-diary').placeholder=L.searchPlaceholder;document.getElementById('search-routes').placeholder=L.searchPlaceholder;
+  document.getElementById('btn-save-postcard').textContent=L.saveImage;
+  document.getElementById('ach-popup-label').textContent=L.achUnlocked;
+  buildTagGrid();
+}
+function saveSignature(){const p=getPrefs();p.signature=document.getElementById('signature-input').value;savePrefs(p)}
+
+// ── BACKUP ──
+async function exportBackup(){
+  const d=getData();const photos=await getAllPhotos();d._photos=photos;
+  const blob=new Blob([JSON.stringify(d)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='withme-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  URL.revokeObjectURL(a.href);delete d._photos;toast(t('backupExported'));
+}
+async function importBackup(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();reader.onload=async e=>{
+    try{
+      const data=JSON.parse(e.target.result);if(!data.routes||!data.pins)throw 0;
+      if(data._photos){for(const[k,v]of Object.entries(data._photos))await savePhoto(k,v);delete data._photos}
+      data.pins.forEach(p=>{if(p.photo){savePhoto(p.id,p.photo);p.hasPhoto=true;delete p.photo}});
+      localStorage.setItem('withme_data',JSON.stringify(data));toast(t('backupRestored'));
+    }catch{toast(t('backupInvalid'))}
+  };reader.readAsText(file);
+}
+
+// ── TABS ──
+function switchTab(tab){
+  ['map','diary','routes','photos','achievements'].forEach(id=>{
+    document.getElementById('nav-'+id).classList.toggle('active',id===tab);
+    if(id!=='map')document.getElementById('panel-'+id).classList.toggle('open',id===tab);
+  });
+  const isMap=tab==='map';
+  document.getElementById('topbar').classList.toggle('hidden',!isMap);
+  document.getElementById('fab').classList.toggle('hidden',!isMap);
+  document.getElementById('locate-btn').classList.toggle('hidden',!isMap);
+  document.getElementById('heatmap-btn').classList.toggle('hidden',!isMap);
+  if(tab==='diary')renderDiary();if(tab==='routes')renderRoutes();
+  if(tab==='achievements')renderAchievements();if(tab==='photos')renderPhotos();
+}
+
+// ── SHEETS ──
+function openSheet(id){document.getElementById(id).classList.add('open')}
+function closeSheet(id){document.getElementById(id).classList.remove('open')}
+function openImportSheet(){if(!getData().activeCity){toast(t('selectCityFirst'));return}editingRouteId=null;document.getElementById('sheet-import-title').textContent=t('importRoute');document.getElementById('btn-save-route').textContent=t('saveRoute');document.getElementById('gpx-import-area').style.display='block';openSheet('sheet-import')}
+function openSettingsSheet(){openSheet('sheet-settings')}
+document.querySelectorAll('.sheet-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')})});
+
+// ── BUILDERS ──
+function buildEmojiGrid(){document.getElementById('pin-emoji-grid').innerHTML=PIN_EMOJIS.map(e=>'<div class="emoji-btn'+(e===selectedEmoji?' selected':'')+'" onclick="selectEmoji(this,\''+e+'\')">'+e+'</div>').join('')}
+function selectEmoji(el,e){document.querySelectorAll('.emoji-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');selectedEmoji=e}
+function buildMoodGrid(){document.getElementById('route-mood-grid').innerHTML=MOODS.map(m=>'<div class="mood-btn'+(m===selectedMood?' selected':'')+'" onclick="selectMood(this,\''+m+'\')">'+m+'</div>').join('')}
+function selectMood(el,m){document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');selectedMood=m}
+function buildWeatherGrid(){document.getElementById('route-weather-grid').innerHTML=WEATHERS.map(w=>'<div class="weather-btn'+(w===selectedWeather?' selected':'')+'" onclick="selectWeather(this,\''+w+'\')">'+w+'</div>').join('')}
+function selectWeather(el,w){document.querySelectorAll('.weather-btn').forEach(b=>b.classList.remove('selected'));if(selectedWeather===w){selectedWeather='';el.classList.remove('selected')}else{el.classList.add('selected');selectedWeather=w}}
+function buildTagGrid(){
+  const tags=currentLang==='zh'?TAGS_ZH:TAGS_EN;
+  const icons=['🍜','🛍','🌙','🌿','🏛','🎲'];
+  document.getElementById('route-tag-grid').innerHTML=tags.map((tg,i)=>'<div class="tag-btn'+(selectedTags.includes(tg)?' selected':'')+'" onclick="toggleTag(this,\''+tg+'\')">'+icons[i]+' '+tg+'</div>').join('');
+}
+function toggleTag(el,tg){if(selectedTags.includes(tg)){selectedTags=selectedTags.filter(t=>t!==tg);el.classList.remove('selected')}else{selectedTags.push(tg);el.classList.add('selected')}}
+function buildColorRow(){document.getElementById('route-color-row').innerHTML=ROUTE_COLORS.map((c,i)=>'<div class="color-dot'+(c===selectedRouteColor?' selected':'')+'" style="background:'+c+'" onclick="selectColor(this,\''+c+'\')"></div>').join('')}
+function selectColor(el,c){document.querySelectorAll('.color-dot').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');selectedRouteColor=c}
+function resetPinForm(){document.getElementById('pin-note').value='';document.getElementById('pin-photo-preview').style.display='none';pendingPinPhoto=null;pendingPinLatLng=null;editingPinId=null;selectedEmoji='📍';buildEmojiGrid()}
+function resetImportForm(){document.getElementById('route-name').value='';document.getElementById('route-story').value='';document.getElementById('gpx-file-input').value='';pendingGPXData=null;editingRouteId=null;selectedMood='😊';selectedWeather='';selectedTags=[];selectedRouteColor='#C9A96E';buildMoodGrid();buildWeatherGrid();buildTagGrid();buildColorRow()}
+
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
 </script>
 </body>
 </html>
