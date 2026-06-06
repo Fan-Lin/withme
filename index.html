@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#1C3829"/>
+<title>WithMe</title>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg: #0f1f18;
+  --surface: #1a2e23;
+  --surface2: #243d2f;
+  --border: #2d5240;
+  --gold: #C9A96E;
+  --gold-dim: #8a7050;
+  --text: #e8e0d0;
+  --text-dim: #8a9e8f;
+  --red: #c97070;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── MAP ── */
+#map {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.leaflet-tile-pane { filter: saturate(0.7) brightness(0.85); }
+.leaflet-container { background: #0f1f18; }
+
+/* ── TOP BAR ── */
+#topbar {
+  position: absolute;
+  top: calc(12px + var(--safe-top));
+  left: 0; right: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+#city-pill {
+  pointer-events: all;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s;
+}
+#city-pill:active { border-color: var(--gold); }
+#city-pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+#top-actions {
+  pointer-events: all;
+  display: flex;
+  gap: 8px;
+}
+
+.top-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s, background 0.2s;
+}
+.top-btn:active { background: var(--surface2); border-color: var(--gold); }
+
+/* ── BOTTOM NAV ── */
+#bottom-nav {
+  position: absolute;
+  bottom: calc(24px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  padding: 6px;
+  display: flex;
+  gap: 4px;
+  backdrop-filter: blur(12px);
+}
+
+.nav-btn {
+  padding: 10px 18px;
+  border-radius: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.nav-btn.active {
+  background: var(--gold);
+  color: #1a1a0e;
+  font-weight: 600;
+}
+
+/* ── FAB ── */
+#fab {
+  position: absolute;
+  bottom: calc(104px + var(--safe-bottom));
+  right: 20px;
+  z-index: 500;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: none;
+  color: #1a1a0e;
+  font-size: 26px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(201,169,110,0.35);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+#fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(201,169,110,0.2); }
+
+/* ── PANELS (diary, routes) ── */
+.panel {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  background: var(--bg);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel.open { display: flex; }
+
+.panel-header {
+  padding: calc(16px + var(--safe-top)) 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.panel-back {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: none;
+  color: var(--text);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── SHEETS (modals from bottom) ── */
+.sheet-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: flex-end;
+}
+.sheet-overlay.open { display: flex; }
+
+.sheet {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border);
+  padding-bottom: calc(24px + var(--safe-bottom));
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto 8px;
+  flex-shrink: 0;
+}
+
+.sheet-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 8px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.sheet-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── FORM ELEMENTS ── */
+.field { margin-bottom: 16px; }
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.field input, .field textarea, .field select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.field input:focus, .field textarea:focus { border-color: var(--gold); }
+.field textarea { resize: none; min-height: 80px; line-height: 1.5; }
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.emoji-btn {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.emoji-btn.selected {
+  border-color: var(--gold);
+  background: rgba(201,169,110,0.12);
+}
+
+.mood-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mood-btn {
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  font-size: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.mood-btn.selected { border-color: var(--gold); background: rgba(201,169,110,0.12); }
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--gold);
+  border: none;
+  color: #1a1a0e;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+.btn-primary:active { opacity: 0.85; }
+
+.btn-secondary {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: border-color 0.15s;
+}
+.btn-secondary:active { border-color: var(--gold); }
+
+.btn-danger {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid #5a2020;
+  color: var(--red);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+/* ── DIARY CARDS ── */
+.diary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.diary-card:active { border-color: var(--gold); }
+.diary-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--gold);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.diary-card:active::before { opacity: 1; }
+
+.diary-date {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+.diary-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.diary-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.diary-meta span { display: flex; align-items: center; gap: 3px; }
+
+.diary-story {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-top: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── ROUTE DETAIL ── */
+.route-detail-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.route-detail-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.route-detail-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+
+.pin-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pin-icon { font-size: 24px; flex-shrink: 0; }
+.pin-info { flex: 1; }
+.pin-note { font-size: 14px; line-height: 1.5; }
+.pin-time { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.pin-photo { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+
+/* ── CITY MANAGER ── */
+.city-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  gap: 12px;
+}
+.city-item-name { flex: 1; font-size: 16px; }
+.city-item-count { font-size: 12px; color: var(--text-dim); }
+.city-active-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 30px;
+  text-align: center;
+  gap: 12px;
+}
+.empty-icon { font-size: 48px; opacity: 0.4; }
+.empty-text { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+
+/* ── TOAST ── */
+#toast {
+  position: absolute;
+  bottom: calc(100px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 900;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 10px 20px;
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── CUSTOM MARKERS ── */
+.pin-marker {
+  width: 36px; height: 36px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(255,255,255,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  font-size: 16px;
+}
+.pin-inner { transform: rotate(45deg); }
+
+.route-line { stroke: var(--gold); stroke-width: 3; fill: none; }
+
+/* ── GPX IMPORT AREA ── */
+.import-area {
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  margin-bottom: 16px;
+}
+.import-area:active { border-color: var(--gold); }
+.import-area-icon { font-size: 32px; margin-bottom: 8px; }
+.import-area-text { font-size: 14px; color: var(--text-dim); }
+
+/* ── PHOTO PREVIEW ── */
+.photo-preview {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  display: none;
+}
+
+/* ── ROUTE COLORS ── */
+.color-row { display: flex; gap: 10px; margin-top: 4px; }
+.color-dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.color-dot.selected { border-color: var(--text); }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div id="city-pill" onclick="openCityManager()">
+    <div class="dot"></div>
+    <span id="city-name-display">选择城市</span>
+  </div>
+  <div id="top-actions">
+    <button class="top-btn" onclick="openImportSheet()" title="导入GPX">＋</button>
+    <button class="top-btn" onclick="openBackupSheet()" title="备份">⊙</button>
+  </div>
+</div>
+
+<!-- FAB -->
+<button id="fab" onclick="startPinMode()" title="插针">📍</button>
+
+<!-- BOTTOM NAV -->
+<div id="bottom-nav">
+  <button class="nav-btn active" onclick="switchTab('map')">地图</button>
+  <button class="nav-btn" onclick="switchTab('diary')">日记</button>
+  <button class="nav-btn" onclick="switchTab('routes')">路线</button>
+</div>
+
+<!-- DIARY PANEL -->
+<div class="panel" id="panel-diary">
+  <div class="panel-header">
+    <div class="panel-title">探城日记</div>
+  </div>
+  <div class="panel-body" id="diary-list"></div>
+</div>
+
+<!-- ROUTES PANEL -->
+<div class="panel" id="panel-routes">
+  <div class="panel-header">
+    <div class="panel-title">全部路线</div>
+  </div>
+  <div class="panel-body" id="routes-list"></div>
+</div>
+
+<!-- ROUTE DETAIL PANEL -->
+<div class="panel" id="panel-route-detail">
+  <div class="panel-header">
+    <button class="panel-back" onclick="closeRouteDetail()">←</button>
+    <div class="panel-title" id="route-detail-title"></div>
+  </div>
+  <div class="panel-body" id="route-detail-body"></div>
+</div>
+
+<!-- ── SHEETS ── -->
+
+<!-- PIN SHEET -->
+<div class="sheet-overlay" id="sheet-pin">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">📍 新标记</div>
+    <div class="sheet-body">
+      <div class="field">
+        <label>图标</label>
+        <div class="emoji-grid" id="pin-emoji-grid"></div>
+      </div>
+      <div class="field">
+        <label>备注（可选）</label>
+        <textarea id="pin-note" placeholder="在这里遇见了什么…"></textarea>
+      </div>
+      <div class="field">
+        <label>照片（可选）</label>
+        <img id="pin-photo-preview" class="photo-preview"/>
+        <input type="file" id="pin-photo-input" accept="image/*" style="display:none" onchange="handlePinPhoto(this)"/>
+        <button class="btn-secondary" onclick="document.getElementById('pin-photo-input').click()">选择照片</button>
+      </div>
+      <button class="btn-primary" onclick="savePin()">保存标记</button>
+      <button class="btn-secondary" onclick="closeSheet('sheet-pin')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT GPX SHEET -->
+<div class="sheet-overlay" id="sheet-import">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">导入路线</div>
+    <div class="sheet-body">
+      <div class="import-area" onclick="document.getElementById('gpx-file-input').click()">
+        <div class="import-area-icon">🗺</div>
+        <div class="import-area-text">点击选择 GPX 文件<br/><small>从 Organic Maps 导出</small></div>
+      </div>
+      <input type="file" id="gpx-file-input" accept=".gpx" style="display:none" onchange="handleGPXFile(this)"/>
+      <div class="field">
+        <label>路线名称</label>
+        <input type="text" id="route-name" placeholder="这次去哪了…"/>
+      </div>
+      <div class="field">
+        <label>故事（可选）</label>
+        <textarea id="route-story" placeholder="写下这次探城的感受…"></textarea>
+      </div>
+      <div class="field">
+        <label>心情</label>
+        <div class="mood-grid" id="route-mood-grid"></div>
+      </div>
+      <div class="field">
+        <label>路线颜色</label>
+        <div class="color-row" id="route-color-row"></div>
+      </div>
+      <button class="btn-primary" onclick="saveRoute()">保存路线</button>
+      <button class="btn-secondary" onclick="closeSheet('sheet-import')">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- CITY MANAGER SHEET -->
+<div class="sheet-overlay" id="sheet-city">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">城市</div>
+    <div class="sheet-body">
+      <div id="city-list"></div>
+      <div class="field" style="margin-top:16px">
+        <label>添加新城市</label>
+        <input type="text" id="new-city-input" placeholder="城市名…"/>
+      </div>
+      <button class="btn-primary" onclick="addCity()">添加</button>
+      <button class="btn-secondary" onclick="closeSheet('sheet-city')">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- BACKUP SHEET -->
+<div class="sheet-overlay" id="sheet-backup">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">数据备份</div>
+    <div class="sheet-body">
+      <p style="font-size:14px;color:var(--text-dim);line-height:1.6;margin-bottom:20px">
+        所有数据保存在本设备。导出备份文件，换设备时可恢复。
+      </p>
+      <button class="btn-primary" onclick="exportBackup()">📤 导出备份</button>
+      <div class="import-area" style="margin-top:12px" onclick="document.getElementById('restore-input').click()">
+        <div class="import-area-icon">📥</div>
+        <div class="import-area-text">点击选择备份文件恢复</div>
+      </div>
+      <input type="file" id="restore-input" accept=".json" style="display:none" onchange="importBackup(this)"/>
+      <button class="btn-secondary" onclick="closeSheet('sheet-backup')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN DETAIL SHEET -->
+<div class="sheet-overlay" id="sheet-pin-detail">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="pin-detail-title">标记详情</div>
+    <div class="sheet-body" id="pin-detail-body"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ── STATE ──
+let map, pendingPinLatLng = null, selectedEmoji = '📍', selectedMood = '😊';
+let pendingGPXData = null, pendingPinPhoto = null;
+let selectedRouteColor = '#C9A96E';
+let activePanel = null;
+
+const PIN_EMOJIS = ['🐱','🍜','🌸','☕','🎨','🚪','🌤','👤','🌿','⭐','🏮','💧','🦋','🎵','🛖','🪨'];
+const MOODS = ['😊','🥰','😌','🤩','😢','😤','🫠','🌙'];
+const ROUTE_COLORS = ['#C9A96E','#7EC8A0','#7EB8C9','#C97E7E','#B07EC9','#C9B87E'];
+
+// ── STORAGE ──
+function getData() {
+  try { return JSON.parse(localStorage.getItem('withme_data') || '{"cities":[],"routes":[],"pins":[],"activeCity":null}'); }
+  catch { return { cities: [], routes: [], pins: [], activeCity: null }; }
+}
+function saveData(d) { localStorage.setItem('withme_data', JSON.stringify(d)); }
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  buildEmojiGrid();
+  buildMoodGrid();
+  buildColorRow();
+  loadMapData();
+  registerSW();
+});
+
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+}
+
+function initMap() {
+  map = L.map('map', {
+    zoomControl: false,
+    attributionControl: true,
+  }).setView([30.5728, 104.0668], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(map);
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  map.on('click', onMapClick);
+}
+
+function loadMapData() {
+  const d = getData();
+  // update city display
+  document.getElementById('city-name-display').textContent = d.activeCity || '选择城市';
+  // draw routes
+  d.routes.filter(r => r.city === d.activeCity).forEach(drawRoute);
+  // draw pins
+  d.pins.filter(p => p.city === d.activeCity).forEach(drawPin);
+}
+
+// ── MAP INTERACTIONS ──
+let pinMode = false;
+function startPinMode() {
+  if (!getData().activeCity) { toast('请先选择城市'); return; }
+  pinMode = true;
+  document.getElementById('fab').textContent = '✕';
+  document.getElementById('fab').onclick = cancelPinMode;
+  toast('点击地图选择标记位置');
+}
+function cancelPinMode() {
+  pinMode = false;
+  document.getElementById('fab').textContent = '📍';
+  document.getElementById('fab').onclick = startPinMode;
+}
+
+function onMapClick(e) {
+  if (!pinMode) return;
+  pendingPinLatLng = e.latlng;
+  cancelPinMode();
+  openSheet('sheet-pin');
+}
+
+// ── DRAW FUNCTIONS ──
+function drawRoute(route) {
+  if (!route.coords || route.coords.length === 0) return;
+  const color = route.color || '#C9A96E';
+  const polyline = L.polyline(route.coords, {
+    color, weight: 3, opacity: 0.85,
+  }).addTo(map);
+  polyline.on('click', () => openRouteDetail(route.id));
+
+  // start/end markers
+  if (route.coords.length > 0) {
+    const start = route.coords[0];
+    const end = route.coords[route.coords.length - 1];
+    L.circleMarker(start, { radius: 5, color, fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+    L.circleMarker(end, { radius: 7, color, fillColor: '#1C3829', fillOpacity: 1, weight: 2 }).addTo(map);
+  }
+}
+
+function drawPin(pin) {
+  const icon = L.divIcon({
+    html: `<div class="pin-marker" style="background:${pin.color||'#1C3829'}">
+             <span class="pin-inner">${pin.emoji||'📍'}</span>
+           </div>`,
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+  });
+  const marker = L.marker([pin.lat, pin.lng], { icon }).addTo(map);
+  marker.on('click', () => openPinDetail(pin.id));
+}
+
+// ── GPX PARSER ──
+function parseGPX(text) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(text, 'application/xml');
+  const coords = [];
+  // try trkpt first, then wpt
+  const trkpts = xml.querySelectorAll('trkpt');
+  trkpts.forEach(pt => {
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const lon = parseFloat(pt.getAttribute('lon'));
+    if (!isNaN(lat) && !isNaN(lon)) coords.push([lat, lon]);
+  });
+  return coords;
+}
+
+function handleGPXFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingGPXData = parseGPX(e.target.result);
+    if (pendingGPXData.length > 0) {
+      toast(`已读取 ${pendingGPXData.length} 个轨迹点`);
+      // auto-fill name from filename
+      const name = file.name.replace('.gpx','').replace(/_/g,' ');
+      document.getElementById('route-name').value = name;
+    } else {
+      toast('未找到轨迹数据');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function handlePinPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    pendingPinPhoto = e.target.result;
+    const preview = document.getElementById('pin-photo-preview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SAVE FUNCTIONS ──
+function savePin() {
+  if (!pendingPinLatLng) { closeSheet('sheet-pin'); return; }
+  const note = document.getElementById('pin-note').value.trim();
+  const d = getData();
+  const pin = {
+    id: Date.now().toString(),
+    city: d.activeCity,
+    lat: pendingPinLatLng.lat,
+    lng: pendingPinLatLng.lng,
+    emoji: selectedEmoji,
+    note,
+    photo: pendingPinPhoto,
+    time: new Date().toISOString(),
+  };
+  d.pins.push(pin);
+  saveData(d);
+  drawPin(pin);
+  closeSheet('sheet-pin');
+  resetPinForm();
+  toast('标记已保存 ' + selectedEmoji);
+}
+
+function saveRoute() {
+  const name = document.getElementById('route-name').value.trim();
+  if (!name) { toast('请输入路线名称'); return; }
+  const d = getData();
+  const route = {
+    id: Date.now().toString(),
+    city: d.activeCity,
+    name,
+    story: document.getElementById('route-story').value.trim(),
+    mood: selectedMood,
+    color: selectedRouteColor,
+    coords: pendingGPXData || [],
+    date: new Date().toISOString(),
+  };
+  if (pendingGPXData && pendingGPXData.length > 0) {
+    // calc distance
+    route.km = calcDistance(pendingGPXData);
+  }
+  d.routes.push(route);
+  saveData(d);
+  drawRoute(route);
+  if (route.coords.length > 0) {
+    map.fitBounds(L.polyline(route.coords).getBounds(), { padding: [40, 40] });
+  }
+  closeSheet('sheet-import');
+  resetImportForm();
+  toast('路线已保存 ✦');
+}
+
+function calcDistance(coords) {
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    total += L.latLng(coords[i-1]).distanceTo(L.latLng(coords[i]));
+  }
+  return (total / 1000).toFixed(1);
+}
+
+// ── CITY MANAGER ──
+function openCityManager() {
+  renderCityList();
+  openSheet('sheet-city');
+}
+
+function renderCityList() {
+  const d = getData();
+  const el = document.getElementById('city-list');
+  if (d.cities.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏙</div><div class="empty-text">还没有城市，添加一个吧</div></div>';
+    return;
+  }
+  el.innerHTML = d.cities.map(c => {
+    const routeCount = d.routes.filter(r => r.city === c).length;
+    const isActive = d.activeCity === c;
+    return `<div class="city-item" onclick="selectCity('${c}')">
+      ${isActive ? '<div class="city-active-dot"></div>' : '<div style="width:8px"></div>'}
+      <div class="city-item-name">${c}</div>
+      <div class="city-item-count">${routeCount} 条路线</div>
+    </div>`;
+  }).join('');
+}
+
+function selectCity(name) {
+  const d = getData();
+  d.activeCity = name;
+  saveData(d);
+  document.getElementById('city-name-display').textContent = name;
+  // reload map
+  map.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.CircleMarker || l instanceof L.Marker) map.removeLayer(l); });
+  // re-add base tile
+  loadMapData();
+  renderCityList();
+  closeSheet('sheet-city');
+  toast('切换到 ' + name);
+}
+
+function addCity() {
+  const name = document.getElementById('new-city-input').value.trim();
+  if (!name) return;
+  const d = getData();
+  if (d.cities.includes(name)) { toast('城市已存在'); return; }
+  d.cities.push(name);
+  if (!d.activeCity) d.activeCity = name;
+  saveData(d);
+  document.getElementById('new-city-input').value = '';
+  document.getElementById('city-name-display').textContent = d.activeCity;
+  renderCityList();
+  toast('已添加 ' + name);
+}
+
+// ── DIARY ──
+function renderDiary() {
+  const d = getData();
+  const el = document.getElementById('diary-list');
+  const routes = d.routes.filter(r => r.city === d.activeCity).sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (routes.length === 0) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📖</div>
+      <div class="empty-text">还没有探城记录<br/>导入 GPX 开始你的第一次</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = routes.map(r => {
+    const date = new Date(r.date);
+    const dateStr = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
+    const pinCount = d.pins.filter(p => p.city === r.city).length;
+    return `<div class="diary-card" onclick="openRouteDetail('${r.id}')">
+      <div class="diary-date">${dateStr}</div>
+      <div class="diary-title">${r.mood||''} ${r.name}</div>
+      <div class="diary-meta">
+        ${r.km ? `<span>🚶 ${r.km} km</span>` : ''}
+        <span style="color:${r.color||'var(--gold)'}">●</span>
+      </div>
+      ${r.story ? `<div class="diary-story">${r.story}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── ROUTES LIST ──
+function renderRoutes() {
+  const d = getData();
+  const el = document.getElementById('routes-list');
+  const routes = d.routes.filter(r => r.city === d.activeCity);
+  if (routes.length === 0) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🗺</div>
+      <div class="empty-text">还没有路线<br/>点击右上角 ＋ 导入 GPX</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = routes.map(r => {
+    const date = new Date(r.date);
+    const dateStr = `${date.getMonth()+1}/${date.getDate()}`;
+    return `<div class="diary-card" onclick="openRouteDetail('${r.id}')">
+      <div class="diary-date">${dateStr} · ${r.coords?.length||0} 个轨迹点</div>
+      <div class="diary-title" style="color:${r.color||'var(--gold)'}">${r.name}</div>
+      <div class="diary-meta">
+        ${r.km ? `<span>🚶 ${r.km} km</span>` : ''}
+        ${r.mood ? `<span>${r.mood}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ROUTE DETAIL ──
+function openRouteDetail(id) {
+  const d = getData();
+  const route = d.routes.find(r => r.id === id);
+  if (!route) return;
+  document.getElementById('route-detail-title').textContent = route.name;
+  const date = new Date(route.date);
+  const dateStr = `${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日`;
+
+  // nearby pins (within ~500m of route start)
+  const nearbyPins = d.pins.filter(p => {
+    if (route.coords.length === 0) return false;
+    // check if within bounding box of route with padding
+    return true; // simplified: show all pins in city
+  }).filter(p => p.city === route.city);
+
+  document.getElementById('route-detail-body').innerHTML = `
+    <div class="route-detail-header">
+      <div class="route-detail-title">${route.mood||''} ${route.name}</div>
+      <div class="route-detail-meta">
+        <span>${dateStr}</span>
+        ${route.km ? `<span>🚶 ${route.km} km</span>` : ''}
+        <span>${route.coords?.length||0} 轨迹点</span>
+      </div>
+    </div>
+    ${route.story ? `<div style="padding:16px 20px;font-size:14px;line-height:1.8;color:var(--text-dim);border-bottom:1px solid var(--border)">${route.story}</div>` : ''}
+    <div style="padding:16px 20px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px">标记点</div>
+      ${nearbyPins.length === 0 ? '<div style="color:var(--text-dim);font-size:14px">本次路线暂无标记</div>' :
+        nearbyPins.map(p => `
+          <div class="pin-list-item">
+            <div class="pin-icon">${p.emoji||'📍'}</div>
+            <div class="pin-info">
+              ${p.note ? `<div class="pin-note">${p.note}</div>` : '<div class="pin-note" style="color:var(--text-dim)">无备注</div>'}
+              <div class="pin-time">${new Date(p.time).toLocaleDateString()}</div>
+            </div>
+            ${p.photo ? `<img class="pin-photo" src="${p.photo}"/>` : ''}
+          </div>
+        `).join('')
+      }
+    </div>
+    <div style="padding:0 20px">
+      <button class="btn-secondary" onclick="flyToRoute('${route.id}')">在地图上查看</button>
+      <button class="btn-danger" onclick="deleteRoute('${route.id}')">删除路线</button>
+    </div>
+  `;
+
+  document.getElementById('panel-route-detail').classList.add('open');
+}
+
+function closeRouteDetail() {
+  document.getElementById('panel-route-detail').classList.remove('open');
+}
+
+function flyToRoute(id) {
+  const d = getData();
+  const route = d.routes.find(r => r.id === id);
+  if (route && route.coords.length > 0) {
+    closeRouteDetail();
+    switchTab('map');
+    map.fitBounds(L.polyline(route.coords).getBounds(), { padding: [40, 40] });
+  }
+}
+
+function deleteRoute(id) {
+  if (!confirm('确定删除这条路线？')) return;
+  const d = getData();
+  d.routes = d.routes.filter(r => r.id !== id);
+  saveData(d);
+  closeRouteDetail();
+  // reload map layers
+  map.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.CircleMarker || l instanceof L.Marker) map.removeLayer(l); });
+  loadMapData();
+  renderRoutes();
+  renderDiary();
+  toast('路线已删除');
+}
+
+// ── PIN DETAIL ──
+function openPinDetail(id) {
+  const d = getData();
+  const pin = d.pins.find(p => p.id === id);
+  if (!pin) return;
+  document.getElementById('pin-detail-title').textContent = pin.emoji + ' 标记';
+  document.getElementById('pin-detail-body').innerHTML = `
+    <div style="font-size:15px;line-height:1.7;margin-bottom:16px">${pin.note || '<span style="color:var(--text-dim)">无备注</span>'}</div>
+    ${pin.photo ? `<img src="${pin.photo}" style="width:100%;border-radius:12px;margin-bottom:16px"/>` : ''}
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:20px">${new Date(pin.time).toLocaleString()}</div>
+    <button class="btn-danger" onclick="deletePin('${pin.id}')">删除标记</button>
+    <button class="btn-secondary" onclick="closeSheet('sheet-pin-detail')">关闭</button>
+  `;
+  openSheet('sheet-pin-detail');
+}
+
+function deletePin(id) {
+  const d = getData();
+  d.pins = d.pins.filter(p => p.id !== id);
+  saveData(d);
+  closeSheet('sheet-pin-detail');
+  map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
+  d.pins.filter(p => p.city === d.activeCity).forEach(drawPin);
+  toast('标记已删除');
+}
+
+// ── BACKUP ──
+function exportBackup() {
+  const d = getData();
+  const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `withme-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('备份已导出');
+}
+
+function importBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.routes || !data.pins) throw new Error('格式错误');
+      localStorage.setItem('withme_data', JSON.stringify(data));
+      toast('备份已恢复，刷新页面生效');
+    } catch {
+      toast('备份文件无效');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  document.querySelectorAll('.nav-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['map','diary','routes'][i] === tab);
+  });
+  document.getElementById('panel-diary').classList.toggle('open', tab === 'diary');
+  document.getElementById('panel-routes').classList.toggle('open', tab === 'routes');
+  document.getElementById('fab').style.display = tab === 'map' ? 'flex' : 'none';
+  if (tab === 'diary') renderDiary();
+  if (tab === 'routes') renderRoutes();
+}
+
+// ── SHEET HELPERS ──
+function openSheet(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('open');
+}
+function openImportSheet() {
+  if (!getData().activeCity) { toast('请先选择城市'); return; }
+  openSheet('sheet-import');
+}
+function openBackupSheet() { openSheet('sheet-backup'); }
+
+// click overlay to close
+document.querySelectorAll('.sheet-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ── EMOJI / MOOD / COLOR BUILDERS ──
+function buildEmojiGrid() {
+  const grid = document.getElementById('pin-emoji-grid');
+  grid.innerHTML = PIN_EMOJIS.map(e =>
+    `<div class="emoji-btn${e==='📍'?' selected':''}" onclick="selectEmoji(this,'${e}')">${e}</div>`
+  ).join('');
+}
+function selectEmoji(el, emoji) {
+  document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedEmoji = emoji;
+}
+
+function buildMoodGrid() {
+  const grid = document.getElementById('route-mood-grid');
+  grid.innerHTML = MOODS.map((m,i) =>
+    `<div class="mood-btn${i===0?' selected':''}" onclick="selectMood(this,'${m}')">${m}</div>`
+  ).join('');
+}
+function selectMood(el, mood) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedMood = mood;
+}
+
+function buildColorRow() {
+  const row = document.getElementById('route-color-row');
+  row.innerHTML = ROUTE_COLORS.map((c,i) =>
+    `<div class="color-dot${i===0?' selected':''}" style="background:${c}" onclick="selectColor(this,'${c}')"></div>`
+  ).join('');
+}
+function selectColor(el, color) {
+  document.querySelectorAll('.color-dot').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedRouteColor = color;
+}
+
+// ── RESET FORMS ──
+function resetPinForm() {
+  document.getElementById('pin-note').value = '';
+  document.getElementById('pin-photo-preview').style.display = 'none';
+  pendingPinPhoto = null;
+  pendingPinLatLng = null;
+  selectedEmoji = '📍';
+  buildEmojiGrid();
+}
+function resetImportForm() {
+  document.getElementById('route-name').value = '';
+  document.getElementById('route-story').value = '';
+  document.getElementById('gpx-file-input').value = '';
+  pendingGPXData = null;
+  selectedMood = '😊';
+  selectedRouteColor = '#C9A96E';
+  buildMoodGrid();
+  buildColorRow();
+}
+
+// ── TOAST ──
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+</script>
+</body>
+</html>
