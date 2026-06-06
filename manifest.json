@@ -2,20 +2,21 @@
   "name": "WithMe",
   "short_name": "WithMe",
   "description": "城市探索日记",
-  "start_url": "./index.html",
+  "start_url": "/withme/",
+  "scope": "/withme/",
   "display": "standalone",
   "background_color": "#1C3829",
   "theme_color": "#1C3829",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "./icons/icon-192.png",
+      "src": "/withme/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icons/icon-512.png",
+      "src": "/withme/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

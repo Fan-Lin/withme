@@ -628,7 +628,7 @@ body {
       </div>
       <button class="btn-secondary" id="btn-close-settings" onclick="closeSheet('sheet-settings')">关闭</button>
       <div style="text-align:center;margin-top:20px;font-size:11px;color:var(--text-dim);opacity:0.5;letter-spacing:0.06em">
-        WithMe v0.2.0
+        WithMe v0.2.1
       </div>
     </div>
   </div>
@@ -657,7 +657,7 @@ body {
 // ══════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════
-const VERSION = 'v0.2.0';
+const VERSION = 'v0.2.1';
 const PIN_EMOJIS = ['🐱','🍜','🌸','☕','🎨','🚪','🌤','👤','🌿','⭐','🏮','💧','🦋','🎵','🛖','🪨'];
 const MOODS = ['😊','🥰','😌','🤩','😢','😤','🫠','🌙'];
 const ROUTE_COLORS = ['#C9A96E','#7EC8A0','#7EB8C9','#C97E7E','#B07EC9','#C9B87E'];
@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
   currentLang = prefs.lang || 'zh';
   currentTheme = prefs.theme || 'default';
   applyTheme(currentTheme, false);
-  applyLang(currentLang, false);
+  applyLang(currentLang);
   initMap();
   buildEmojiGrid(); buildMoodGrid(); buildColorRow();
   loadMapData();
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function registerSW() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/withme/sw.js').catch(()=>{});
 }
 
 function t(key) { return (T[currentLang] || T.zh)[key] || key; }
@@ -1219,24 +1219,57 @@ function applyTheme(theme, save) {
 
 function setLang(lang) {
   currentLang = lang;
-  applyLang(lang, true);
+  applyLang(lang);
   const p = getPrefs(); p.lang = lang; savePrefs(p);
 }
 
-function applyLang(lang, save) {
+function applyLang(lang) {
   currentLang = lang;
+  const L = T[lang];
   document.getElementById('lang-zh').classList.toggle('active', lang==='zh');
   document.getElementById('lang-en').classList.toggle('active', lang==='en');
-  // update nav labels
-  document.getElementById('nav-map').textContent        = T[lang].map;
-  document.getElementById('nav-diary').textContent      = T[lang].diary;
-  document.getElementById('nav-routes').textContent     = T[lang].routes;
-  document.getElementById('nav-achievements').textContent = T[lang].achievements;
-  document.getElementById('city-name-display').textContent = getData().activeCity || T[lang].selectCity;
-  // theme names
-  document.getElementById('theme-name-default').textContent = T[lang].themeDefault;
-  document.getElementById('theme-name-classic').textContent = T[lang].themeClassic;
-  document.getElementById('theme-name-journal').textContent = T[lang].themeJournal;
+  document.getElementById('nav-map').textContent           = L.map;
+  document.getElementById('nav-diary').textContent         = L.diary;
+  document.getElementById('nav-routes').textContent        = L.routes;
+  document.getElementById('nav-achievements').textContent  = L.achievements;
+  document.getElementById('city-name-display').textContent = getData().activeCity || L.selectCity;
+  document.getElementById('title-diary').textContent       = L.diary;
+  document.getElementById('title-routes').textContent      = L.routes;
+  document.getElementById('title-achievements').textContent= L.achievements;
+  document.getElementById('sheet-pin-title').textContent   = L.newPin;
+  document.getElementById('sheet-import-title').textContent= L.importRoute;
+  document.getElementById('sheet-city-title').textContent  = L.cityTitle;
+  document.getElementById('sheet-settings-title').textContent = L.settings;
+  document.getElementById('lbl-icon').textContent          = L.icon;
+  document.getElementById('lbl-note').textContent          = L.note;
+  document.getElementById('lbl-photo').textContent         = L.photo;
+  document.getElementById('pin-note').placeholder          = L.notePlaceholder;
+  document.getElementById('btn-choose-photo').textContent  = L.choosePhoto;
+  document.getElementById('btn-save-pin').textContent      = L.savePin;
+  document.getElementById('btn-cancel-pin').textContent    = L.cancel;
+  document.getElementById('lbl-route-name').textContent    = L.routeName;
+  document.getElementById('lbl-story').textContent         = L.story;
+  document.getElementById('lbl-mood').textContent          = L.mood;
+  document.getElementById('lbl-color').textContent         = L.color;
+  document.getElementById('route-name').placeholder        = L.routeNamePlaceholder;
+  document.getElementById('route-story').placeholder       = L.storyPlaceholder;
+  document.getElementById('import-hint').innerHTML         = L.importHint + "<br/><small>" + L.importSub + "</small>";
+  document.getElementById('btn-save-route').textContent    = L.saveRoute;
+  document.getElementById('btn-cancel-route').textContent  = L.cancel;
+  document.getElementById('lbl-new-city').textContent      = L.addCity;
+  document.getElementById('new-city-input').placeholder    = L.cityPlaceholder;
+  document.getElementById('btn-add-city').textContent      = L.add;
+  document.getElementById('btn-done-city').textContent     = L.done;
+  document.getElementById('lbl-lang').textContent          = L.lang;
+  document.getElementById('lbl-theme').textContent         = L.theme;
+  document.getElementById('lbl-backup').textContent        = L.backup;
+  document.getElementById('btn-export').textContent        = L.exportBackup;
+  document.getElementById('restore-hint').textContent      = L.restoreHint;
+  document.getElementById('btn-close-settings').textContent= L.closeSettings;
+  document.getElementById('theme-name-default').textContent= L.themeDefault;
+  document.getElementById('theme-name-classic').textContent= L.themeClassic;
+  document.getElementById('theme-name-journal').textContent= L.themeJournal;
+  document.getElementById('ach-popup-label').textContent   = L.achUnlocked;
 }
 
 // ══════════════════════════════════════

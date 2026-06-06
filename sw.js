@@ -1,11 +1,10 @@
-const CACHE_NAME = 'withme-v1';
+const CACHE_NAME = 'withme-v0.2.1';
 const ASSETS = [
-  './index.html',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  '/withme/',
+  '/withme/index.html',
+  '/withme/manifest.json',
+  '/withme/icons/icon-192.png',
+  '/withme/icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
