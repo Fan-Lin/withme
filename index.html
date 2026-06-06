@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function registerSW() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/withme/sw.js').catch(()=>{});
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 
 function t(key) { return (T[currentLang] || T.zh)[key] || key; }

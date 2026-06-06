@@ -1,10 +1,10 @@
-const CACHE_NAME = 'withme-v0.2.2';
+const CACHE_NAME = 'withme-v0.2.1';
 const ASSETS = [
-  '/withme/',
-  '/withme/index.html',
-  '/withme/manifest.json',
-  '/withme/icons/icon-192.png',
-  '/withme/icons/icon-512.png',
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -18,8 +18,9 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    )
   );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
